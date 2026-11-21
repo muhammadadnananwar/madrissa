@@ -19,7 +19,9 @@ def env_list(key, default=""):
 
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-insecure-change-me-in-production")
-DEBUG = env_bool("DJANGO_DEBUG", True)
+ON_RAILWAY = bool(env("RAILWAY_ENVIRONMENT") or env("RAILWAY_PROJECT_ID"))
+# Debug is off by default on Railway (never show Django's debug pages publicly); on by default for local development.
+DEBUG = env_bool("DJANGO_DEBUG", not ON_RAILWAY)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 # Railway sets RAILWAY_PUBLIC_DOMAIN (e.g. api-production.up.railway.app) for services with a public domain.
 RAILWAY_PUBLIC_DOMAIN = env("RAILWAY_PUBLIC_DOMAIN", "")
@@ -28,6 +30,8 @@ if RAILWAY_PUBLIC_DOMAIN:
 if env("RAILWAY_PRIVATE_DOMAIN"):
     ALLOWED_HOSTS.append(env("RAILWAY_PRIVATE_DOMAIN"))
 ALLOWED_HOSTS.append("healthcheck.railway.app")  # Railway deploy health checks
+if ON_RAILWAY:
+    ALLOWED_HOSTS.append(".up.railway.app")  # every *.up.railway.app domain given to this service (custom names too)
 
 INSTALLED_APPS = [
     "django.contrib.admin",

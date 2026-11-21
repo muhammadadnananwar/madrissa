@@ -1,6 +1,20 @@
 import axios from 'axios';
 
-export const API_URL = import.meta.env.VITE_API_URL || '/api';
+/**
+ * Base URL of the website API (Django: /api/site). Accepts either the full base
+ * ("https://api.example.com/api/site") or just the backend domain ("https://api.example.com"),
+ * in which case /api/site is added.
+ */
+function apiBase(raw) {
+  const v = (raw || '/api/site').trim().replace(/\/+$/, '');
+  try {
+    const u = new URL(v);
+    if (u.pathname === '' || u.pathname === '/') return `${u.origin}/api/site`;
+  } catch { /* relative path such as /api/site */ }
+  return v;
+}
+
+export const API_URL = apiBase(import.meta.env.VITE_API_URL);
 export const ASSET_URL = import.meta.env.VITE_ASSET_URL || '';
 export const PORTAL_URL = (import.meta.env.VITE_PORTAL_URL || 'http://localhost:4322').replace(/\/$/, '');
 

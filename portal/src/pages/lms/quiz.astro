@@ -1,0 +1,41 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Quiz">
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { post } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { busy, clear, confirmDialog, h, param } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    ready.then(async () => {
+      let d: any;
+      try { d = await post(`quizzes/${param("id")}/start/`); } catch (e: any) { return clear(root, h("div", { class: "alert bad" }, e.message), h("a", { href: "javascript:history.back()" }, "← Back")); }
+      const answers = new Map<number, { choices: Set<number>; text: string }>();
+      d.questions.forEach((q: any) => answers.set(q.id, { choices: new Set(), text: "" }));
+      const timer = h("strong", {});
+      const submit = h("button", { class: "btn primary" }, "Submit quiz");
+      let submitted = false;
+      const send = async (auto = false) => {
+        if (submitted) return;
+        if (!auto && !(await confirmDialog("Submit your answers? You cannot change them afterwards.", "Submit"))) return;
+        submitted = true;
+        const r = await busy(submit, () => post(`quiz-attempts/${d.attempt}/submit/`, { answers: [...answers.entries()].map(([question, a]) => ({ question, choices: [...a.choices], text: a.text })) }));
+        if (r) location.href = `/lms/attempt?id=${d.attempt}`; else submitted = false;
+      };
+      submit.onclick = () => send();
+      if (d.remaining_seconds != null) {
+        let left = d.remaining_seconds;
+        const tick = () => { timer.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`; if (left-- <= 0) { clearInterval(iv); send(true); } };
+        const iv = setInterval(tick, 1000); tick();
+      }
+      clear(root, h("div", { class: "page-head" }, h("div", {}, h("h1", {}, d.quiz.title), h("p", {}, d.quiz.description || "")), h("div", { class: "card", style: { padding: ".6rem 1rem" } }, timer)),
+        h("div", { class: "stack" }, d.questions.map((q: any, i: number) => h("div", { class: "card" },
+          h("div", { class: "row between" }, h("h3", {}, `Q${i + 1}. `, h("span", { style: { fontWeight: 500, whiteSpace: "pre-wrap" } }, q.text)), h("span", { class: "muted small" }, `${q.marks} mark(s)`)),
+          q.kind === "short" ? h("textarea", { oninput: (e: any) => (answers.get(q.id)!.text = e.target.value) })
+            : h("div", { class: "stack" }, q.choices.map((c: any) => h("label", { style: { fontWeight: 500, display: "flex", gap: ".5rem" } },
+              h("input", { type: q.kind === "multi" ? "checkbox" : "radio", name: `q${q.id}`, onchange: (e: any) => { const a = answers.get(q.id)!; if (q.kind !== "multi") a.choices.clear(); e.target.checked ? a.choices.add(c.id) : a.choices.delete(c.id); } }), c.text)))))),
+          submit);
+    });
+  </script>
+</Portal>

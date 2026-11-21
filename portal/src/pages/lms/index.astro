@@ -1,0 +1,36 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Courses">
+  <div class="page-head"><div><h1>Learning (LMS)</h1><p>Courses, lessons, assignments, quizzes and discussions.</p></div><div class="row" id="act"></div></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../../lib/api";
+    import { openForm } from "../../lib/crud";
+    import { ready } from "../../lib/shell";
+    import { badge, busy, clear, empty, fmtDate, h, table } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    ready.then(async (u) => {
+      const load = async () => {
+        const d = await get("lms/my-courses/");
+        const blocks: any[] = [h("div", { class: "grid auto" }, d.courses.length ? d.courses.map((c: any) => h("a", { class: "card", href: `/lms/course?id=${c.id}` },
+          c.cover ? h("img", { src: c.cover, alt: "", style: { width: "100%", height: "120px", objectFit: "cover", borderRadius: "8px", marginBottom: ".6rem" } }) : null,
+          h("h3", {}, c.title), h("div", { class: "muted small" }, [c.code, c.teacher, c.section].filter(Boolean).join(" · ")),
+          h("div", { class: "small", style: { marginTop: ".5rem" } }, `${c.lessons} lessons `, !c.is_published ? badge("draft", "unpublished") : null),
+          c.progress !== undefined ? h("div", { style: { marginTop: ".5rem" } }, h("div", { class: "progress" }, h("span", { style: { width: `${c.progress}%` } })), h("div", { class: "small muted" }, `${c.progress}% complete`)) : null))
+          : empty("No courses yet."))];
+        if (d.open_courses.length) blocks.push(h("div", { class: "card" }, h("h3", {}, "Open courses you can join"), table([{ label: "Course", render: (c: any) => c.title }, { label: "Teacher", render: (c: any) => c.teacher },
+          { label: "", render: (c: any) => h("button", { class: "btn sm primary", onclick: async (e: any) => { if (await busy(e.target, () => post(`courses/${c.id}/enroll/`))) location.href = `/lms/course?id=${c.id}`; } }, "Enroll") }], d.open_courses)));
+        if (["student", "parent"].includes(u.role)) {
+          const tasks = await get("lms/my-tasks/");
+          blocks.push(h("div", { class: "card" }, h("h3", {}, "Assignments & quizzes"), table([{ label: "Task", render: (t: any) => h("a", { href: `/lms/course?id=${t.course_id}` }, t.title) }, { label: "Type", render: (t: any) => t.type },
+            { label: "Course", render: (t: any) => t.course }, u.role === "parent" ? { label: "Child", render: (t: any) => t.student } : null,
+            { label: "Due", render: (t: any) => fmtDate(t.due) }, { label: "Status", render: (t: any) => badge(t.status) }].filter(Boolean) as any, tasks, { emptyText: "No pending work." })));
+        }
+        clear(root, h("div", { class: "stack" }, blocks));
+      };
+      if (u.is_staff_member) document.getElementById("act")!.append(h("a", { class: "btn", href: "/m/courses" }, "Manage all"), h("button", { class: "btn primary", onclick: () => openForm("courses", null, (c) => (location.href = `/lms/course?id=${c.id}`)) }, "New course"));
+      load();
+    });
+  </script>
+</Portal>

@@ -1,0 +1,43 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="Calendar">
+  <div class="page-head"><div><h1 id="title">Calendar</h1><p>Events, holidays, exams and live classes.</p></div>
+    <div class="row"><button class="btn" id="prev">‹</button><button class="btn" id="today">Today</button><button class="btn" id="next">›</button></div></div>
+  <div class="legend"><span><i style="background:var(--brand-100)"></i>Event</span><span><i style="background:var(--gold-100)"></i>Holiday</span><span><i style="background:var(--danger-bg)"></i>Exam</span><span><i style="background:var(--info-bg)"></i>Live class</span></div>
+  <div class="card flush"><div id="cal" class="cal"></div></div>
+  <script>
+    import { get } from "../lib/api";
+    import { ready } from "../lib/shell";
+    import { clear, h } from "../lib/ui";
+    let cur = new Date(); cur.setDate(1);
+    const iso = (d: Date) => d.toLocaleDateString("en-CA");
+    async function render() {
+      const first = new Date(cur), start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
+      const end = new Date(start); end.setDate(start.getDate() + 41);
+      document.getElementById("title")!.textContent = cur.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      const items = await get("communication/calendar/", { start: iso(start), end: iso(end) });
+      const byDay: Record<string, any[]> = {};
+      for (const it of items) {
+        const s = new Date(String(it.start).length === 10 ? `${it.start}T00:00:00` : it.start);
+        const e = it.end ? new Date(String(it.end).length === 10 ? `${it.end}T00:00:00` : it.end) : s;
+        for (let d = new Date(s); d <= e && d <= end; d.setDate(d.getDate() + 1)) (byDay[iso(d)] ||= []).push(it);
+      }
+      const cells: any[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => h("div", { class: "hd" }, d));
+      for (let i = 0; i < 42; i++) {
+        const d = new Date(start); d.setDate(start.getDate() + i);
+        const k = iso(d);
+        cells.push(h("div", { class: `${d.getMonth() !== cur.getMonth() ? "out" : ""} ${k === iso(new Date()) ? "today" : ""}` },
+          h("div", { style: { fontWeight: 600 } }, d.getDate()),
+          (byDay[k] || []).slice(0, 4).map((it) => it.type === "live" ? h("a", { class: "ev live", href: `/live/room?id=${it.id}`, title: it.title }, it.title)
+            : h("span", { class: `ev ${it.type}`, title: `${it.title}${it.kind ? " — " + it.kind : ""}` }, it.title)),
+          (byDay[k] || []).length > 4 ? h("span", { class: "small muted" }, `+${byDay[k].length - 4} more`) : null));
+      }
+      clear(document.getElementById("cal")!, cells);
+    }
+    document.getElementById("prev")!.onclick = () => { cur.setMonth(cur.getMonth() - 1); render(); };
+    document.getElementById("next")!.onclick = () => { cur.setMonth(cur.getMonth() + 1); render(); };
+    document.getElementById("today")!.onclick = () => { cur = new Date(); cur.setDate(1); render(); };
+    ready.then(render);
+  </script>
+</Portal>

@@ -1,0 +1,57 @@
+# Development: `docker compose up -d db` (PostgreSQL only) and run the apps locally.
+# Full stack:  `docker compose --profile full up -d --build`
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: madrasa-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-madrasa}
+      POSTGRES_USER: ${POSTGRES_USER:-madrasa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-madrasa}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - madrasa_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-madrasa} -d ${POSTGRES_DB:-madrasa}"]
+      interval: 5s
+      retries: 10
+
+  api:
+    profiles: ["full"]
+    build: ./backend
+    env_file: ./backend/.env
+    environment:
+      POSTGRES_HOST: db
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["8000:8000"]
+    volumes:
+      - madrasa_media:/app/media
+
+  website:
+    profiles: ["full"]
+    build:
+      context: ./website
+      args:
+        VITE_API_URL: /api/site            # nginx in the image proxies /api and /media to the api service
+        VITE_PORTAL_URL: ${PUBLIC_PORTAL_URL:-http://localhost:4322}
+    environment:
+      BACKEND_URL: http://api:8000         # nginx proxies /api and /media to Django
+    depends_on: [api]
+    ports: ["4321:80"]
+
+  portal:
+    profiles: ["full"]
+    build:
+      context: ./portal
+      args:
+        PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+        PUBLIC_WEBSITE_URL: ${PUBLIC_WEBSITE_URL:-http://localhost:4321}
+    depends_on: [api]
+    ports: ["4322:4322"]
+
+volumes:
+  madrasa_pgdata:
+  madrasa_media:

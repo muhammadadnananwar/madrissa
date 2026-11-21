@@ -1,0 +1,41 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Marks entry">
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { badge, busy, clear, fmtDate, fmtTime, h, param, table } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    async function sheet(paperId: string) {
+      clear(root, h("div", { class: "spinner" }));
+      const d = await get(`exams/papers/${paperId}/marks/`);
+      const p = d.paper;
+      const rows = d.rows.map((r: any) => ({ ...r }));
+      const stats = h("span", { class: "muted small" });
+      const upd = () => { const v = rows.filter((r: any) => !r.is_absent && r.marks_obtained != null && r.marks_obtained !== "").map((r: any) => Number(r.marks_obtained)); stats.textContent = v.length ? `Entered ${v.length}/${rows.length} · avg ${(v.reduce((a: number, b: number) => a + b, 0) / v.length).toFixed(1)} · passed ${v.filter((x: number) => x >= Number(p.pass_marks)).length}` : "No marks entered"; };
+      const save = h("button", { class: "btn primary", disabled: p.locked }, "Save marks");
+      save.onclick = () => busy(save, async () => { await post(`exams/papers/${paperId}/marks/`, { records: rows.map((r: any) => ({ student: r.student, marks_obtained: r.is_absent || r.marks_obtained === "" ? null : r.marks_obtained, is_absent: r.is_absent, remarks: r.remarks })) }); return { detail: "Marks saved." }; });
+      clear(root, h("div", { class: "page-head" }, h("div", {}, h("a", { href: "/exams/marks", class: "small" }, "← All papers"), h("h1", {}, p.label), h("p", {}, `Max ${p.max_marks} · pass ${p.pass_marks} · ${fmtDate(p.date)}`)), p.locked ? badge("cancelled", "Locked") : null),
+        h("div", { class: "card flush" }, h("div", { class: "toolbar" }, stats, h("div", { style: { flex: 1 } }), save),
+          h("div", { class: "table-wrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Roll", "Student", `Marks (/${p.max_marks})`, "Absent", "Remarks"].map((x) => h("th", {}, x)))),
+            h("tbody", {}, rows.map((r: any) => {
+              const m = h("input", { type: "number", class: "inline-input", style: { width: "90px" }, min: 0, max: p.max_marks, step: "any", value: r.marks_obtained ?? "", disabled: r.is_absent || p.locked,
+                oninput: (e: any) => { const v = e.target.value; r.marks_obtained = v; e.target.style.borderColor = v !== "" && (Number(v) > Number(p.max_marks) || Number(v) < 0) ? "var(--danger)" : ""; upd(); } });
+              return h("tr", {}, h("td", {}, r.roll_no), h("td", {}, h("strong", {}, r.name), h("div", { class: "small muted" }, r.admission_no)), h("td", {}, m),
+                h("td", {}, h("input", { type: "checkbox", checked: r.is_absent, disabled: p.locked, onchange: (e: any) => { r.is_absent = e.target.checked; m.disabled = r.is_absent; upd(); } })),
+                h("td", {}, h("input", { class: "inline-input", value: r.remarks, disabled: p.locked, oninput: (e: any) => (r.remarks = e.target.value) })));
+            }))))));
+      upd();
+    }
+    async function list() {
+      const papers = await get("exams/mine/");
+      clear(root, h("div", { class: "page-head" }, h("div", {}, h("h1", {}, "Marks entry"), h("p", {}, "Papers of the current academic year you can enter marks for.")), h("a", { class: "btn", href: "/m/exam-papers" }, "Date sheet")),
+        h("div", { class: "card flush" }, table([{ label: "Exam", render: (p: any) => p.exam }, { label: "Section", render: (p: any) => p.section }, { label: "Subject", render: (p: any) => p.subject },
+          { label: "Date", render: (p: any) => `${fmtDate(p.date)} ${p.start_time ? fmtTime(p.start_time) : ""}` }, { label: "Max", render: (p: any) => p.max_marks, cls: "num" },
+          { label: "", render: (p: any) => p.locked ? badge("cancelled", "locked") : p.can_enter ? h("a", { class: "btn sm primary", href: `/exams/marks?paper=${p.id}` }, "Enter marks") : "—" }], papers.filter((p: any) => p.can_enter || p.locked), { emptyText: "No papers assigned to you." })));
+    }
+    ready.then(() => (param("paper") ? sheet(param("paper")!) : list()));
+  </script>
+</Portal>

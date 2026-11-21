@@ -1,0 +1,38 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="My check-in">
+  <div class="page-head"><div><h1>My attendance</h1><p>Check in when you arrive and check out when you leave. Your IP and (optionally) location are recorded.</p></div></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { badge, busy, clear, fmtDate, fmtTime, h, table } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    function draw(d: any) {
+      const t = d.today;
+      const act = async (btn: HTMLButtonElement, action: string) => {
+        const location = await new Promise<string>((res) => navigator.geolocation ? navigator.geolocation.getCurrentPosition((p) => res(`${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`), () => res(""), { timeout: 4000 }) : res(""));
+        const r = await busy(btn, () => post("attendance/staff/self/", { action, location }), "Saved.");
+        if (r) draw(r);
+      };
+      clear(root, h("div", { class: "card row between", style: { marginBottom: "1rem" } },
+        h("div", {}, h("h2", {}, new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })),
+          t.status ? h("div", {}, badge(t.status), ` In ${fmtTime(t.check_in)} · Out ${fmtTime(t.check_out)}${t.hours ? ` · ${t.hours} h` : ""}`) : h("div", { class: "muted" }, "Not checked in.")),
+        h("div", { class: "row" },
+          !t.check_in ? h("button", { class: "btn primary", onclick: (e: any) => act(e.currentTarget, "check_in") }, "Check in") : null,
+          t.check_in && !t.check_out ? h("button", { class: "btn gold", onclick: (e: any) => act(e.currentTarget, "check_out") }, "Check out") : null)),
+        h("div", { class: "card flush" }, table([{ label: "Date", render: (r: any) => fmtDate(r.date) }, { label: "Status", render: (r: any) => r.status },
+          { label: "In", render: (r: any) => fmtTime(r.check_in) }, { label: "Out", render: (r: any) => fmtTime(r.check_out) }, { label: "Hours", render: (r: any) => r.hours ?? "—" }], d.history)));
+    }
+    ready.then(async () => {
+      try { draw(await get("attendance/staff/self/")); } catch (e: any) { clear(root, h("div", { class: "alert warn" }, e.message)); return; }
+      try {
+        const p = await get("biometric-punches/", { page_size: 30 });
+        if (p.results.length) root.append(h("div", { class: "card flush", style: { marginTop: "1rem" } }, h("div", { class: "toolbar" }, h("strong", {}, "My recent biometric punches")),
+          table([{ label: "Time", render: (r: any) => new Date(r.punched_at).toLocaleString() }, { label: "Device", render: (r: any) => r.device_label || "—" },
+            { label: "Type", render: (r: any) => r.direction_display }, { label: "Method", render: (r: any) => r.verify_mode || "—" }], p.results)));
+      } catch { /* no punches */ }
+    });
+  </script>
+</Portal>

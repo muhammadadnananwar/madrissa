@@ -1,0 +1,38 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="Timetable">
+  <div class="page-head"><div><h1>Timetable</h1><p id="sub">Weekly schedule</p></div><div class="row" id="pick"></div></div>
+  <div class="card flush" id="tt"><div class="spinner"></div></div>
+  <script>
+    import { get } from "../lib/api";
+    import { ACADEMIC, hasRole } from "../lib/roles";
+    import { ready } from "../lib/shell";
+    import { clear, empty, h, param } from "../lib/ui";
+    const box = document.getElementById("tt")!;
+    async function render(params: any) {
+      const d = await get("academics/timetable-view/", params);
+      if (!d.entries.length) return clear(box, empty("No timetable entries yet."));
+      const days = d.days.filter((x: any) => d.entries.some((e: any) => e.day === x.value));
+      const showSection = !params.section;
+      clear(box, h("div", { class: "table-wrap" }, h("table", { class: "tt" },
+        h("thead", {}, h("tr", {}, h("th", { style: { width: "130px" } }, "Period"), days.map((x: any) => h("th", {}, x.label)))),
+        h("tbody", {}, d.slots.map((s: any) => h("tr", {}, h("td", {}, h("strong", {}, s.name), h("div", { class: "small muted" }, `${s.start}–${s.end}`)),
+          days.map((x: any) => {
+            const es = d.entries.filter((e: any) => e.day === x.value && e.slot === s.id);
+            if (s.is_break) return h("td", { class: "brk" }, s.name);
+            return h("td", {}, es.map((e: any) => h("div", { class: "cell" }, h("strong", {}, e.subject || e.note), h("div", { class: "small muted" }, [showSection ? e.section : e.teacher, e.room].filter(Boolean).join(" · ")))));
+          })))))));
+    }
+    ready.then(async (u) => {
+      if (hasRole(u, ACADEMIC) || u.role === "teacher") {
+        const secs = await get("academics/my-sections/");
+        const sel = h("select", {}, h("option", { value: "" }, u.role === "teacher" ? "My timetable" : "— choose section —"), secs.map((s: any) => h("option", { value: s.id }, s.label)));
+        sel.value = param("section") || "";
+        sel.onchange = () => render(sel.value ? { section: sel.value } : {});
+        document.getElementById("pick")!.append(sel, h("a", { class: "btn", href: "/m/timetable" }, "Edit entries"));
+        if (sel.value || u.role === "teacher") render(sel.value ? { section: sel.value } : {}); else clear(box, empty("Choose a section."));
+      } else render({});
+    });
+  </script>
+</Portal>

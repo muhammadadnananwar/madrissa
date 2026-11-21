@@ -1,0 +1,29 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Fee defaulters">
+  <div class="page-head"><div><h1>Fee defaulters</h1><p id="sum">Students with overdue balances.</p></div><div class="row" id="act"></div></div>
+  <div class="card flush" id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { busy, clear, fmtDate, fmtMoney, h, selectEl, table } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    ready.then(async () => {
+      const sections = await get("academics/my-sections/");
+      const sec = selectEl(sections.map((s: any) => ({ value: s.id, label: s.label })), "", { style: { width: "auto" } }, "All sections");
+      const remind = h("button", { class: "btn" }, "Send reminders");
+      remind.onclick = () => busy(remind, () => post("finance/defaulters/remind/"));
+      document.getElementById("act")!.append(sec, remind);
+      const load = async () => {
+        const d = await get("finance/defaulters/", { section: sec.value });
+        document.getElementById("sum")!.textContent = `${d.rows.length} student(s) · total overdue ${fmtMoney(d.total)}`;
+        clear(root, table([{ label: "Student", render: (r: any) => h("a", { href: `/fees?student=${r.student}` }, r.name) }, { label: "Adm. no", render: (r: any) => r.admission_no },
+          { label: "Section", render: (r: any) => r.section }, { label: "Guardian phone", render: (r: any) => r.guardian_phone ? h("a", { href: `tel:${r.guardian_phone}` }, r.guardian_phone) : "—" },
+          { label: "Invoices", render: (r: any) => r.invoices, cls: "num" }, { label: "Oldest due", render: (r: any) => fmtDate(r.oldest_due) }, { label: "Balance", render: (r: any) => h("strong", {}, fmtMoney(r.balance)), cls: "num" }], d.rows, { emptyText: "No defaulters. Alhamdulillah!" }));
+      };
+      sec.onchange = load;
+      load();
+    });
+  </script>
+</Portal>

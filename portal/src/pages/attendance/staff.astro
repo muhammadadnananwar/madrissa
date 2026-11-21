@@ -1,0 +1,34 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Staff attendance">
+  <div class="page-head"><div><h1>Staff attendance</h1><p>Mark or correct attendance of all staff for a day. Self check-ins appear automatically.</p></div>
+    <div class="row"><input type="date" id="d" style="width:auto" /><a class="btn" href="/m/staff-attendance">All records</a></div></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { busy, clear, h, today } from "../../lib/ui";
+    const root = document.getElementById("root")!, d = document.getElementById("d") as HTMLInputElement;
+    d.value = today(); d.max = today();
+    const ST = ["present", "absent", "late", "leave", "half_day", "excused"];
+    async function load() {
+      const data = await get("attendance/staff/sheet/", { date: d.value });
+      const rows = data.staff.map((s: any) => ({ ...s, status: s.status || "" }));
+      const save = h("button", { class: "btn primary" }, "Save");
+      save.onclick = () => busy(save, () => post("attendance/staff/bulk/", { date: d.value, records: rows.filter((r: any) => r.status).map((r: any) => ({ employee: r.employee, status: r.status, check_in: r.check_in || null, check_out: r.check_out || null, remarks: r.remarks })) }));
+      clear(root, data.is_holiday ? h("div", { class: "alert warn" }, "Holiday / weekly off.") : null,
+        h("div", { class: "card flush" }, h("div", { class: "toolbar" }, h("button", { class: "btn sm success", onclick: () => { rows.forEach((r: any) => (r.status ||= "present")); load2(); } }, "Fill unmarked as present"), h("div", { style: { flex: 1 } }), save),
+          h("div", { class: "table-wrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Employee", "Designation", "Status", "In", "Out", "Remarks"].map((x) => h("th", {}, x)))), h("tbody", { id: "tb" })))));
+      const load2 = () => clear(document.getElementById("tb")!, rows.map((r: any) => h("tr", {},
+        h("td", {}, h("strong", {}, r.name), h("div", { class: "small muted" }, r.employee_no)), h("td", {}, r.designation),
+        h("td", {}, h("select", { class: "inline-input", onchange: (e: any) => (r.status = e.target.value) }, h("option", { value: "" }, "—"), ST.map((s) => h("option", { value: s, selected: r.status === s }, s.replace("_", " "))))),
+        h("td", {}, h("input", { type: "time", class: "inline-input", value: (r.check_in || "").slice(0, 5), onchange: (e: any) => (r.check_in = e.target.value) })),
+        h("td", {}, h("input", { type: "time", class: "inline-input", value: (r.check_out || "").slice(0, 5), onchange: (e: any) => (r.check_out = e.target.value) })),
+        h("td", {}, h("input", { class: "inline-input", value: r.remarks, oninput: (e: any) => (r.remarks = e.target.value) })))));
+      load2();
+    }
+    d.onchange = load;
+    ready.then(load);
+  </script>
+</Portal>

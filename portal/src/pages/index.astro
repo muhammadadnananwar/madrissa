@@ -1,0 +1,105 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="Dashboard">
+  <div id="dash"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../lib/api";
+    import { groupedColumns, lineChart } from "../lib/charts";
+    import { FINANCE, hasRole } from "../lib/roles";
+    import { ready } from "../lib/shell";
+    import { badge, busy, clear, fmtDate, fmtDateTime, fmtMoney, fmtTime, h, statCard, toastError } from "../lib/ui";
+
+    const root = document.getElementById("dash")!;
+    const money = (v: any) => (typeof v === "number" || /^\d+(\.\d+)?$/.test(String(v)) ? fmtMoney(v) : v);
+    const MONEY_CARDS = /fees|donations|expenses|dues/i;
+
+    function listCard(title: string, items: any[], render: (i: any) => any, more?: string) {
+      return h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", {}, title), more ? h("a", { href: more, class: "small" }, "View all") : null),
+        items?.length ? h("ul", { class: "list" }, items.map((i) => h("li", {}, render(i)))) : h("p", { class: "muted" }, "Nothing here."));
+    }
+
+    function checkInWidget(att: any) {
+      const box = h("div", { class: "card row between" });
+      const draw = (a: any) => clear(box,
+        h("div", {}, h("h3", {}, "My attendance today"),
+          h("div", { class: "muted" }, a.status ? [badge(a.status), ` In: ${fmtTime(a.check_in)}  ·  Out: ${fmtTime(a.check_out)}`] : "You have not checked in yet.")),
+        h("div", { class: "row" },
+          !a.check_in ? h("button", { class: "btn primary", onclick: (e: any) => act(e.currentTarget, "check_in") }, "Check in") : null,
+          a.check_in && !a.check_out ? h("button", { class: "btn gold", onclick: (e: any) => act(e.currentTarget, "check_out") }, "Check out") : null));
+      async function act(btn: HTMLButtonElement, action: string) {
+        const location = await new Promise<string>((res) => {
+          if (!navigator.geolocation) return res("");
+          navigator.geolocation.getCurrentPosition((p) => res(`${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`), () => res(""), { timeout: 4000 });
+        });
+        const r = await busy(btn, () => post("attendance/staff/self/", { action, location }), action === "check_in" ? "Checked in. Bismillah!" : "Checked out. JazakAllah khair!");
+        if (r) draw(r.today);
+      }
+      draw(att);
+      return box;
+    }
+
+    ready.then(async (user) => {
+      let d: any;
+      try { d = await get("dashboard/"); } catch (e) { toastError(e); return; }
+      const hour = new Date().getHours();
+      const greet = hour < 12 ? "Sabah al-khair" : hour < 17 ? "Assalamu alaikum" : "Masa al-khair";
+      const blocks: any[] = [
+        h("div", { class: "page-head" }, h("div", {}, h("h1", {}, `${greet}, ${user.first_name || user.full_name}`),
+          h("p", {}, `${user.role_display} · ${new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`))),
+      ];
+      if (d.my_attendance) blocks.push(checkInWidget(d.my_attendance));
+      if (d.cards.length) blocks.push(h("div", { class: "grid auto" }, d.cards.map((c: any) =>
+        statCard(c.label, MONEY_CARDS.test(c.label) ? money(c.value) : c.value, c.icon, { href: c.link, tone: c.tone === "default" ? "" : c.tone }))));
+
+      if (d.children?.length) {
+        blocks.push(h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", {}, "My children")),
+          h("div", { class: "grid auto" }, d.children.map((c: any) => h("div", { class: "card" },
+            h("h3", {}, c.name), h("div", { class: "muted small" }, `${c.admission_no} · ${c.section}`),
+            h("ul", { class: "list" },
+              h("li", {}, "Attendance", h("strong", {}, c.attendance == null ? "—" : `${c.attendance}%`)),
+              h("li", {}, "Fee dues", h("strong", {}, fmtMoney(c.dues))),
+              h("li", {}, "Paras memorised (Hifz)", h("strong", {}, c.juz_memorized)),
+              c.quran ? [h("li", {}, "Noorani Qaida", h("strong", {}, c.quran.qaida.completed ? "completed" : c.quran.qaida.current ? `on takhti ${c.quran.qaida.current}` : "—")),
+                h("li", {}, "Nazra", h("strong", {}, `${c.quran.nazra}/30 paras${c.quran.nazra_khatms ? ` · ${c.quran.nazra_khatms} khatm` : ""}`)),
+                h("li", {}, "Tarjuma", h("strong", {}, `${c.quran.tarjuma_percentage}%`))] : null),
+            h("div", { class: "row" }, h("a", { class: "btn sm", href: `/person/${c.user_id}` }, "Full record"),
+              h("a", { class: "btn sm", href: `/exams/report-card?student=${c.id}` }, "Results"),
+              h("a", { class: "btn sm", href: `/fees?student=${c.id}` }, "Fees"), h("a", { class: "btn sm", href: `/hifz?student=${c.id}` }, "Quran")))))));
+      }
+
+      const charts = h("div", { class: "grid cols-2" });
+      if (d.charts?.attendance_7d) charts.appendChild(h("div", { class: "card" }, lineChart("Student attendance — last 7 days", d.charts.attendance_7d, { suffix: "%", max: 100 })));
+      if (hasRole(user, FINANCE)) {
+        try {
+          const f = await get("finance/summary/");
+          const m = f.monthly.slice(-6);
+          charts.appendChild(h("div", { class: "card" }, groupedColumns("Income & expenses — last 6 months",
+            m.map((x: any) => new Date(`${x.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "short" })),
+            [{ name: "Fees", values: m.map((x: any) => +x.fees) }, { name: "Donations", values: m.map((x: any) => +x.donations) },
+              { name: "Expenses", values: m.map((x: any) => +x.expenses) }], { format: (n) => fmtMoney(n) })));
+        } catch { /* ignore */ }
+      }
+      if (charts.childElementCount) blocks.push(charts);
+
+      const L = d.lists || {};
+      const grid = h("div", { class: "grid cols-3" });
+      if (L.unmarked_sections?.length) grid.appendChild(listCard("Attendance not marked today", L.unmarked_sections, (s: string) => [h("span", {}, s), h("a", { href: "/attendance" }, "Mark")]));
+      if (L.timetable_today?.length) grid.appendChild(listCard("Today's timetable", L.timetable_today, (t: any) => [h("span", {}, h("strong", {}, t.subject), h("div", { class: "muted small" }, `${t.section} · ${t.teacher} ${t.room ? "· " + t.room : ""}`)), h("span", { class: "nowrap" }, t.time)], "/timetable"));
+      if (L.tasks?.length) grid.appendChild(listCard("Upcoming tasks", L.tasks, (t: any) => [h("a", { href: `/lms/course?id=${t.course_id}` }, h("strong", {}, t.title), h("div", { class: "muted small" }, `${t.type} · ${t.course}${user.role === "parent" ? " · " + t.student : ""}`)), h("span", {}, badge(t.status), h("div", { class: "small muted" }, t.due ? fmtDate(t.due) : ""))], "/lms"));
+      grid.appendChild(listCard("Live classes", L.live_classes, (l: any) => [h("a", { href: `/live/room?id=${l.id}` }, h("strong", {}, l.title), h("div", { class: "muted small" }, `${l.teacher} · ${l.section}`)), h("span", { class: "small nowrap" }, l.status === "live" ? badge("live", "LIVE") : fmtDateTime(l.start))], "/live"));
+      grid.appendChild(listCard("Notice board", L.announcements, (a: any) => [h("a", { href: "/announcements" }, a.title), a.priority !== "normal" ? badge(a.priority) : h("span", { class: "muted small" }, fmtDate(a.publish_at))], "/announcements"));
+      grid.appendChild(listCard("Upcoming events", L.events, (e: any) => [h("span", {}, e.title, h("div", { class: "muted small" }, e.kind)), h("span", { class: "small nowrap" }, fmtDate(e.start))], "/calendar"));
+      blocks.push(grid);
+
+      if (user.is_staff_member) {
+        try {
+          const pending = await get("leaves/pending/");
+          if (pending.length) blocks.push(listCard(`Leave requests awaiting your approval (${pending.length})`, pending.slice(0, 6),
+            (l: any) => [h("span", {}, h("strong", {}, l.user), h("div", { class: "muted small" }, `${l.leave_type} · ${fmtDate(l.start_date)} → ${fmtDate(l.end_date)}`)), h("a", { href: "/leaves" }, "Review")], "/leaves"));
+        } catch { /* not an approver */ }
+      }
+      clear(root, h("div", { class: "stack" }, blocks));
+    });
+  </script>
+</Portal>

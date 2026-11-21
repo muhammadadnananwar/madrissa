@@ -1,0 +1,74 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="Messages">
+  <div class="page-head"><div><h1>Messages</h1><p>Private messages between parents, students and staff.</p></div><button id="new" class="btn primary">New message</button></div>
+  <div class="grid" style="grid-template-columns:minmax(260px,360px) 1fr">
+    <div class="card flush">
+      <div class="toolbar"><select id="box" style="width:auto"><option value="inbox">Inbox</option><option value="sent">Sent</option></select></div>
+      <div id="list"></div>
+    </div>
+    <div class="card" id="thread"><p class="muted">Select a conversation.</p></div>
+  </div>
+  <script>
+    import { api, del, get, post } from "../lib/api";
+    import { ready } from "../lib/shell";
+    import { busy, clear, confirmDialog, empty, fmtDateTime, h, modal, param, spinner } from "../lib/ui";
+    const list = document.getElementById("list")!, thread = document.getElementById("thread")!, box = document.getElementById("box") as HTMLSelectElement;
+
+    function recipientPicker() {
+      const input = h("input", { type: "search", placeholder: "Type a name…" });
+      const sel = h("select", { size: 6 });
+      let t: any;
+      const load = async () => { const r = await get("communication/recipients/", { q: input.value }); clear(sel, r.map((x: any) => h("option", { value: x.id }, x.label))); };
+      input.addEventListener("input", () => { clearTimeout(t); t = setTimeout(load, 250); });
+      load();
+      return { el: h("div", {}, input, sel), value: () => Number(sel.value) || null };
+    }
+    function compose(prefill: any = {}) {
+      const pick = prefill.recipient ? null : recipientPicker();
+      const subject = h("input", { value: prefill.subject || "" });
+      const body = h("textarea", { rows: 6 });
+      const file = h("input", { type: "file" });
+      const send = h("button", { class: "btn primary" }, "Send");
+      const m = modal(prefill.recipient ? `Reply to ${prefill.recipientName}` : "New message", h("div", {},
+        pick ? h("div", { class: "field" }, h("label", {}, "To"), pick.el) : null,
+        h("div", { class: "field" }, h("label", {}, "Subject"), subject),
+        h("div", { class: "field" }, h("label", {}, "Message"), body),
+        h("div", { class: "field" }, h("label", {}, "Attachment"), file)), { actions: [send] });
+      send.addEventListener("click", async () => {
+        const fd = new FormData();
+        const to = prefill.recipient || pick?.value();
+        if (!to) return;
+        fd.append("recipient", String(to)); fd.append("subject", subject.value || "(no subject)"); fd.append("body", body.value);
+        if (prefill.reply_to) fd.append("reply_to", String(prefill.reply_to));
+        if (file.files?.[0]) fd.append("attachment", file.files[0]);
+        const r = await busy(send, () => api("messages/", { method: "POST", body: fd }), "Message sent.");
+        if (r) { m.close(); loadList(); if (prefill.reply_to) openThread(prefill.reply_to); }
+      });
+    }
+    async function openThread(id: number) {
+      clear(thread, spinner());
+      const msgs = await get(`messages/${id}/thread/`);
+      const last = msgs[msgs.length - 1];
+      for (const m of msgs) if (!m.mine && !m.read_at) post(`messages/${m.id}/read/`);
+      const other = last.mine ? { id: last.recipient_id, name: last.recipient } : { id: last.sender_id, name: last.sender };
+      clear(thread, h("div", { class: "card-head" }, h("h2", {}, msgs[0].subject),
+        h("div", { class: "row" }, h("button", { class: "btn primary sm", onclick: () => compose({ recipient: other.id, recipientName: other.name, subject: `Re: ${msgs[0].subject.replace(/^Re: /, "")}`, reply_to: last.id }) }, "Reply"),
+          h("button", { class: "btn sm danger", onclick: async () => { if (await confirmDialog("Delete this message?")) { await del(`messages/${id}/`); clear(thread, h("p", { class: "muted" }, "Deleted.")); loadList(); } } }, "Delete"))),
+        msgs.map((m: any) => h("div", { style: { padding: ".8rem", borderRadius: "8px", margin: ".5rem 0", background: m.mine ? "var(--brand-50)" : "var(--surface-2)", marginLeft: m.mine ? "15%" : "0", marginRight: m.mine ? "0" : "15%" } },
+          h("div", { class: "small muted" }, `${m.sender} → ${m.recipient} · ${fmtDateTime(m.created_at)}`),
+          h("div", { style: { whiteSpace: "pre-wrap", marginTop: ".3rem" } }, m.body),
+          m.attachment ? h("a", { href: m.attachment, target: "_blank" }, "📎 Attachment") : null)));
+    }
+    async function loadList() {
+      const d = await get("messages/", { box: box.value });
+      clear(list, d.results.length ? h("ul", { class: "list", style: { padding: "0 1rem" } }, d.results.map((m: any) => h("li", { style: { cursor: "pointer", fontWeight: !m.read_at && box.value === "inbox" ? 700 : 400 }, onclick: () => openThread(m.id) },
+        h("div", {}, h("div", {}, m.subject), h("div", { class: "small muted" }, box.value === "inbox" ? m.sender_label : `To: ${m.recipient_label}`)),
+        h("div", { class: "small muted nowrap" }, fmtDateTime(m.created_at))))) : empty("No messages."));
+    }
+    box.addEventListener("change", loadList);
+    document.getElementById("new")!.addEventListener("click", () => compose());
+    ready.then(() => { loadList(); const id = param("id"); if (id) openThread(Number(id)); });
+  </script>
+</Portal>

@@ -1,0 +1,47 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Results">
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { badge, clear, empty, h, selectEl } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    ready.then(async (u) => {
+      if (u.role === "student") return (location.href = `/exams/report-card?student=${u.student!.id}`);
+      if (u.role === "parent") {
+        const kids = u.children || [];
+        return clear(root, h("div", { class: "page-head" }, h("div", {}, h("h1", {}, "Results"), h("p", {}, "Report cards of your children"))),
+          kids.length ? h("div", { class: "grid auto" }, kids.map((k: any) => h("a", { class: "card", href: `/exams/report-card?student=${k.id}` }, h("h3", {}, k.name), h("div", { class: "muted" }, k.section), h("div", { style: { marginTop: ".5rem" } }, "View report card →")))) : empty("No children linked."));
+      }
+      const exams = (await get("exams/", { page_size: 100 })).results;
+      const sections = await get("academics/my-sections/", { all: 1 });
+      const ex = selectEl(exams.map((e: any) => ({ value: e.id, label: `${e.name} (${e.academic_year_label})` })), exams[0]?.id, { style: { width: "auto" } });
+      const sec = selectEl(sections.map((s: any) => ({ value: s.id, label: s.label })), sections[0]?.id, { style: { width: "auto" } });
+      const body = h("div", {});
+      async function load() {
+        if (!ex.value || !sec.value) return clear(body, empty("Choose an exam and a section."));
+        clear(body, h("div", { class: "spinner" }));
+        const r = await get("exams/result/", { exam: ex.value, section: sec.value });
+        if (!r.subjects.length) return clear(body, empty("No papers for this section in this exam."));
+        clear(body, h("div", { class: "grid cols-3", style: { marginBottom: "1rem" } },
+          h("div", { class: "card stat" }, h("div", {}, h("div", { class: "val" }, r.stats.students), h("div", { class: "lbl" }, "Students"))),
+          h("div", { class: "card stat good" }, h("div", {}, h("div", { class: "val" }, `${r.stats.passed}`), h("div", { class: "lbl" }, `Passed (${r.stats.students ? Math.round((r.stats.passed / r.stats.students) * 100) : 0}%)`))),
+          h("div", { class: "card stat" }, h("div", {}, h("div", { class: "val" }, `${r.stats.average}%`), h("div", { class: "lbl" }, "Class average")))),
+          !r.exam.is_published ? h("div", { class: "alert warn" }, "Results are not yet published to students and parents.") : null,
+          h("div", { class: "card flush" }, h("div", { class: "toolbar" }, h("strong", {}, `Tabulation sheet — ${r.exam.name} · ${r.section.label}`), h("div", { style: { flex: 1 } }), h("button", { class: "btn sm", onclick: () => print() }, "Print")),
+            h("div", { class: "table-wrap" }, h("table", { style: { fontSize: "12.5px" } },
+              h("thead", {}, h("tr", {}, h("th", {}, "Pos."), h("th", {}, "Student"), r.subjects.map((s: any) => h("th", { class: "num" }, `${s.subject} (${s.max})`)), h("th", { class: "num" }, "Total"), h("th", { class: "num" }, "%"), h("th", {}, "Grade"), h("th", {}, "Result"), h("th", {}, ""))),
+              h("tbody", {}, r.rows.slice().sort((a: any, b: any) => (a.position ?? 999) - (b.position ?? 999)).map((row: any) => h("tr", {},
+                h("td", {}, row.position ?? "—"), h("td", {}, h("strong", {}, row.name), h("div", { class: "small muted" }, row.admission_no)),
+                row.subjects.map((s: any) => h("td", { class: "num", style: { color: s.passed ? "" : "var(--danger)" } }, s.absent ? "Abs" : s.obtained ?? "—")),
+                h("td", { class: "num" }, `${row.total}/${row.max_total}`), h("td", { class: "num" }, row.percentage), h("td", {}, row.grade), h("td", {}, badge(row.result.toLowerCase(), row.result)),
+                h("td", { class: "no-print" }, h("a", { href: `/exams/report-card?student=${row.student}&exam=${r.exam.id}` }, "Card")))))))));
+      }
+      ex.onchange = load; sec.onchange = load;
+      clear(root, h("div", { class: "page-head" }, h("div", {}, h("h1", {}, "Results"), h("p", {}, "Tabulation, positions and grades")), h("div", { class: "row no-print" }, ex, sec, h("a", { class: "btn", href: "/m/exams" }, "Manage exams"))), body);
+      load();
+    });
+  </script>
+</Portal>

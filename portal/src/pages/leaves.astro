@@ -1,0 +1,113 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="Leaves">
+  <div class="page-head"><div><h1>Leaves</h1><p>Apply for leave, track approvals and balances.</p></div></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { api, get, post } from "../lib/api";
+    import { mountCrud } from "../lib/crud";
+    import { remoteSelect } from "../lib/form";
+    import { HR, hasRole } from "../lib/roles";
+    import { ready } from "../lib/shell";
+    import { badge, busy, clear, confirmDialog, fmtDate, h, modal, table, tabs, today } from "../lib/ui";
+    const root = document.getElementById("root")!;
+
+    ready.then(async (user) => {
+      const isParent = user.role === "parent";
+      const isStaff = user.is_staff_member;
+      const body = h("div", {});
+      const tabList = [{ key: "mine", label: isParent ? "Children's leaves" : "My leaves" }, { key: "apply", label: "Apply" }];
+      let pending: any[] = [];
+      if (isStaff) {
+        try { pending = await get("leaves/pending/"); tabList.push({ key: "approve", label: `Approvals (${pending.length})` }); } catch { /* not approver */ }
+      }
+      if (hasRole(user, HR) || hasRole(user, ["academic_coordinator"])) tabList.push({ key: "all", label: "All requests" }, { key: "today", label: "On leave today" });
+
+      async function balanceCards(uid?: number) {
+        const b = await get("leaves/balance/", uid ? { user: uid } : {});
+        return h("div", { class: "grid auto", style: { marginBottom: "1rem" } }, b.types.map((t: any) => h("div", { class: "card" },
+          h("div", { class: "muted small" }, t.name, t.is_paid ? "" : " (unpaid)"),
+          h("div", { class: "stat" }, h("div", { class: "val" }, t.remaining == null ? "∞" : t.remaining), h("div", { class: "lbl" }, t.allowed ? `left of ${t.allowed} · used ${t.used}` : `used ${t.used}`)))));
+      }
+
+      async function mine() {
+        clear(body, h("div", { class: "spinner" }));
+        const d = await get("leave-requests/", { page_size: 100 });
+        clear(body, isParent ? null : await balanceCards(), h("div", { class: "card flush" }, table([
+          { label: "Person", render: (r: any) => r.user_label },
+          { label: "Type", render: (r: any) => r.leave_type_label },
+          { label: "From", render: (r: any) => fmtDate(r.start_date) }, { label: "To", render: (r: any) => fmtDate(r.end_date) },
+          { label: "Days", render: (r: any) => r.days, cls: "num" },
+          { label: "Reason", render: (r: any) => r.reason },
+          { label: "Status", render: (r: any) => h("div", {}, badge(r.status, r.status_display), r.review_remarks ? h("div", { class: "small muted" }, r.review_remarks) : null) },
+          { label: "", render: (r: any) => ["pending", "approved"].includes(r.status) && new Date(`${r.start_date}T00:00:00`) > new Date()
+            ? h("button", { class: "btn sm", onclick: async (e: any) => { if (await confirmDialog("Cancel this leave request?")) { await busy(e.target, () => post(`leave-requests/${r.id}/cancel/`)); mine(); } } }, "Cancel") : "" },
+        ], d.results, { emptyText: "No leave requests yet." })));
+      }
+
+      async function apply() {
+        const types = (await get("leave-types/", { page_size: 100 })).results.filter((t: any) => t.applies_to === "both" || t.applies_to === (isStaff ? "staff" : "student"));
+        const kids = user.children || [];
+        const child = isParent ? h("select", {}, kids.map((k: any) => h("option", { value: k.user_id }, k.name))) : null;
+        const type = h("select", { required: true }, types.map((t: any) => h("option", { value: t.id, dataset: { doc: t.requires_document ? "1" : "" } }, `${t.name}${t.days_per_year ? ` (${t.days_per_year}/year)` : ""}`)));
+        const start = h("input", { type: "date", min: today(), value: today() });
+        const end = h("input", { type: "date", min: today(), value: today() });
+        const half = h("input", { type: "checkbox" });
+        const reason = h("textarea", { required: true, placeholder: "Reason for leave" });
+        const doc = h("input", { type: "file" });
+        const sub = isStaff && user.role === "teacher" ? remoteSelect("users", null, { filters: { role: "teacher" } }) : null;
+        const submit = h("button", { class: "btn primary" }, "Submit application");
+        const docHint = h("div", { class: "help hidden" }, "A supporting document is required for this leave type.");
+        type.onchange = () => docHint.classList.toggle("hidden", !type.selectedOptions[0]?.dataset.doc);
+        type.dispatchEvent(new Event("change"));
+        submit.onclick = async () => {
+          const fd = new FormData();
+          if (child) fd.append("user", child.value);
+          fd.append("leave_type", type.value); fd.append("start_date", start.value); fd.append("end_date", end.value);
+          fd.append("half_day", String(half.checked)); fd.append("reason", reason.value);
+          if (doc.files?.[0]) fd.append("document", doc.files[0]);
+          const s = sub && (sub as any).getValue(); if (s) fd.append("substitute", String(s));
+          const r = await busy(submit, () => api("leave-requests/", { method: "POST", body: fd }), "Leave application submitted.");
+          if (r) set("mine");
+        };
+        const balanceBox = h("div", {});
+        if (child) { const draw = async () => clear(balanceBox, await balanceCards(Number(child.value))); child.onchange = draw; draw(); }
+        else clear(balanceBox, await balanceCards());
+        clear(body, balanceBox, h("div", { class: "card", style: { maxWidth: "720px" } }, h("div", { class: "form-grid" },
+          child ? h("div", { class: "field full" }, h("label", {}, "Child"), child) : null,
+          h("div", { class: "field full" }, h("label", {}, "Leave type"), type, docHint),
+          h("div", { class: "field" }, h("label", {}, "From"), start), h("div", { class: "field" }, h("label", {}, "To"), end),
+          h("div", { class: "field check full" }, h("label", {}, half, "Half day")),
+          h("div", { class: "field full" }, h("label", {}, "Reason"), reason),
+          h("div", { class: "field" }, h("label", {}, "Supporting document"), doc),
+          sub ? h("div", { class: "field" }, h("label", {}, "Substitute teacher"), sub) : null), submit));
+      }
+
+      function approve() {
+        const review = (l: any, action: "approve" | "reject") => {
+          const remarks = h("input", { placeholder: action === "reject" ? "Reason (shown to applicant)" : "Remarks (optional)" });
+          const go = h("button", { class: `btn ${action === "approve" ? "primary" : "danger"}` }, action === "approve" ? "Approve" : "Reject");
+          const m = modal(`${action === "approve" ? "Approve" : "Reject"} leave — ${l.user}`, h("div", {}, h("p", {}, `${l.leave_type}: ${fmtDate(l.start_date)} → ${fmtDate(l.end_date)} (${l.days} day(s))`), h("p", { class: "muted" }, l.reason), remarks), { actions: [go] });
+          go.onclick = async () => { if (await busy(go, () => post(`leave-requests/${l.id}/${action}/`, { remarks: remarks.value }))) { m.close(); pending = pending.filter((p) => p.id !== l.id); approve(); } };
+        };
+        clear(body, h("div", { class: "card flush" }, table([
+          { label: "Applicant", render: (l: any) => h("div", {}, h("strong", {}, l.user), h("div", { class: "small muted" }, l.role)) },
+          { label: "Type", render: (l: any) => l.leave_type }, { label: "Dates", render: (l: any) => `${fmtDate(l.start_date)} → ${fmtDate(l.end_date)}` },
+          { label: "Days", render: (l: any) => l.days, cls: "num" }, { label: "Reason", render: (l: any) => l.reason },
+          { label: "Document", render: (l: any) => (l.document ? h("a", { href: l.document, target: "_blank" }, "view") : "—") },
+          { label: "", render: (l: any) => h("div", { class: "row" }, h("button", { class: "btn sm success", onclick: () => review(l, "approve") }, "Approve"), h("button", { class: "btn sm danger", onclick: () => review(l, "reject") }, "Reject")) },
+        ], pending, { emptyText: "No pending requests. Alhamdulillah!" })));
+      }
+
+      async function onToday() {
+        const rows = await get("leaves/today/");
+        clear(body, h("div", { class: "card flush" }, table([{ label: "Name", render: (r: any) => r.user }, { label: "Role", render: (r: any) => r.role }, { label: "Type", render: (r: any) => r.type },
+          { label: "Until", render: (r: any) => fmtDate(r.until) }, { label: "Substitute", render: (r: any) => r.substitute || "—" }], rows, { emptyText: "Nobody is on leave today." })));
+      }
+
+      const set = (k: string) => ({ mine, apply, approve, all: () => mountCrud(body, "leave-requests", { title: false }), today: onToday } as any)[k]();
+      clear(root, tabs(tabList, set, new URLSearchParams(location.search).get("tab") || (pending.length ? "approve" : "mine")), body);
+    });
+  </script>
+</Portal>

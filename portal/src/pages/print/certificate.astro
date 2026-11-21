@@ -1,0 +1,27 @@
+---
+import Print from "../../layouts/Print.astro";
+const websiteUrl = import.meta.env.PUBLIC_WEBSITE_URL || "http://localhost:4321";
+---
+<Print title="Certificate">
+  <div id="cfg" data-site={websiteUrl}></div>
+  <script>
+    import { get } from "../../lib/api";
+    import { requireUser } from "../../lib/guard";
+    import { clear, fmtDate, h, param } from "../../lib/ui";
+    requireUser().then(async () => {
+      const d = await get(`exams/certificates/${param("id")}/print/`);
+      const site = document.getElementById("cfg")!.dataset.site;
+      clear(document.getElementById("doc")!, h("div", { class: "print-page" }, h("div", { class: "certificate" }, h("img", { class: "cert-logo", src: "/brand/mark.svg", alt: "" }),
+        d.is_revoked ? h("div", { class: "alert bad" }, "REVOKED") : null,
+        h("div", { class: "ar", style: { fontSize: "26px", color: "var(--brand-700)" } }, "بسم الله الرحمن الرحيم"),
+        h("div", { class: "ar", style: { fontSize: "22px", marginTop: ".5rem" } }, d.institution.name_arabic),
+        h("h2", { style: { margin: ".25rem 0" } }, d.institution.name), d.institution.affiliation ? h("div", { class: "small muted" }, d.institution.affiliation) : null,
+        h("h1", { style: { margin: "2rem 0 1rem" } }, d.title),
+        h("p", { style: { fontSize: "1.1rem" } }, "This is to certify that"), h("h2", { style: { fontFamily: "Georgia, serif", fontSize: "1.8rem" } }, d.person),
+        d.father_name ? h("p", {}, `son/daughter of ${d.father_name}`) : null,
+        h("p", { style: { fontSize: "1.05rem", maxWidth: "560px", margin: "1rem auto" } }, d.details), d.grade ? h("p", {}, h("strong", {}, `Grade: ${d.grade}`)) : null,
+        h("div", { class: "row between", style: { marginTop: "3rem" } }, h("div", {}, "______________", h("div", { class: "small" }, "Nazim-e-Taleemat")), h("div", { class: "small" }, `Serial: ${d.serial_no}`, h("br"), `Issued: ${fmtDate(d.issue_date)}`), h("div", {}, "______________", h("div", { class: "small" }, "Mohtamim"))),
+        h("p", { class: "small muted", style: { marginTop: "1.5rem" } }, `Verify at ${site}/verify?code=${d.verification_code}`))));
+    });
+  </script>
+</Print>

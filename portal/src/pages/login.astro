@@ -1,0 +1,52 @@
+---
+import Blank from "../layouts/Blank.astro";
+const websiteUrl = import.meta.env.PUBLIC_WEBSITE_URL || "http://localhost:4321";
+---
+<Blank title="Sign in">
+  <div class="auth-wrap">
+    <section class="auth-side">
+      <div><img src="/brand/logo-white.svg" alt="University of Muhammadia Saifia" style="width:260px;max-width:100%;height:auto" /><div class="brand-sub" style="margin-top:.5rem;font-size:13px">Management portal · Students · Teachers · Accounts · Administration</div></div>
+      <div>
+        <div class="ayah">رَّبِّ زِدْنِي عِلْمًا</div>
+        <p style="color:#c8b9e3;margin-top:.5rem">“My Lord, increase me in knowledge.” — Surah Ta-Ha 20:114</p>
+      </div>
+      <a href={websiteUrl} style="color:#a593cc">← Back to the public website</a>
+    </section>
+    <section class="auth-form">
+      <form class="card" id="login-form">
+        <h1>Assalamu alaikum</h1>
+        <p class="muted" style="margin-top:0">Sign in to the portal with the username given by the madrasa office.</p>
+        <div id="err" class="alert bad hidden" role="alert"></div>
+        <div class="field"><label for="u">Username</label><input id="u" name="username" autocomplete="username" required /></div>
+        <div class="field"><label for="p">Password</label><input id="p" name="password" type="password" autocomplete="current-password" required /></div>
+        <button class="btn primary" style="width:100%;justify-content:center" type="submit">Sign in</button>
+        <p class="small" style="text-align:center;margin-top:1rem"><a href="/forgot-password">Forgot password?</a></p>
+      </form>
+    </section>
+  </div>
+  <script>
+    import { api, getSession, setSession } from "../lib/api";
+    const params = new URLSearchParams(location.search);
+    const next = params.get("next") || "/";
+    if (getSession()) location.href = next;
+    const form = document.getElementById("login-form") as HTMLFormElement;
+    const err = document.getElementById("err")!;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      err.classList.add("hidden");
+      const btn = form.querySelector("button")!;
+      btn.disabled = true;
+      try {
+        const data = new FormData(form);
+        const r = await api("auth/login/", { method: "POST", body: { username: data.get("username"), password: data.get("password") }, auth: false });
+        setSession({ access: r.access, refresh: r.refresh, user: r.user });
+        location.href = r.user.must_change_password ? "/profile?force=1" : next;
+      } catch (e: any) {
+        err.textContent = e.status === 401 ? "Incorrect username or password." : e.message;
+        err.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</Blank>

@@ -1,0 +1,10 @@
+.env
+.DS_Store
+node_modules/
+dist/
+.astro/
+__pycache__/
+*.pyc
+.venv/
+backend/media/
+_backup/

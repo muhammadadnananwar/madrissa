@@ -1,0 +1,31 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Report card">
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { badge, clear, empty, h, param } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    ready.then(async () => {
+      let d: any;
+      try { d = await get("exams/report-card/", { student: param("student"), exam: param("exam") }); } catch (e: any) { return clear(root, h("div", { class: "alert bad" }, e.message)); }
+      const s = d.student, inst = d.institution;
+      clear(root, h("div", { class: "print-actions" }, h("button", { class: "btn primary", onclick: () => print() }, "Print report card")),
+        d.cards.length ? d.cards.map((c: any) => h("div", { class: "print-page", style: { pageBreakAfter: "always" } },
+          h("div", { class: "print-head" }, h("div", {}, h("h2", { style: { margin: 0 } }, inst.name), h("div", { class: "small muted" }, inst.address), inst.affiliation ? h("div", { class: "small muted" }, `Affiliated with ${inst.affiliation}`) : null), h("div", { class: "ar" }, inst.name_arabic)),
+          h("h2", { style: { textAlign: "center" } }, `Result card — ${c.exam.name}`), h("p", { style: { textAlign: "center" }, class: "muted" }, `${c.exam.kind} · ${c.exam.year}`),
+          h("dl", { class: "kv", style: { marginBottom: "1rem" } }, h("dt", {}, "Student"), h("dd", {}, h("strong", {}, s.name)), h("dt", {}, "Father's name"), h("dd", {}, s.father_name || "—"),
+            h("dt", {}, "Admission / roll no"), h("dd", {}, `${s.admission_no} / ${s.roll_no || "—"}`), h("dt", {}, "Class"), h("dd", {}, c.section.label), h("dt", {}, "Attendance"), h("dd", {}, d.attendance_percentage == null ? "—" : `${d.attendance_percentage}%`)),
+          h("table", {}, h("thead", {}, h("tr", {}, ["Subject", "Kitab", "Max", "Pass", "Obtained", ""].map((x) => h("th", {}, x)))),
+            h("tbody", {}, c.result.subjects.map((x: any) => h("tr", {}, h("td", {}, x.subject), h("td", {}, x.book || ""), h("td", { class: "num" }, x.max), h("td", { class: "num" }, x.pass), h("td", { class: "num" }, x.absent ? "Absent" : x.obtained ?? "—"), h("td", {}, x.passed ? "" : "✗"))),
+              h("tr", { style: { fontWeight: 700 } }, h("td", { colspan: 4 }, "Total"), h("td", { class: "num" }, `${c.result.total} / ${c.result.max_total}`), h("td", {})))),
+          h("div", { class: "grid cols-4", style: { marginTop: "1rem" } },
+            h("div", {}, h("div", { class: "muted small" }, "Percentage"), h("h2", {}, `${c.result.percentage}%`)), h("div", {}, h("div", { class: "muted small" }, "Grade"), h("h2", {}, c.result.grade), h("div", { class: "ar" }, c.result.remarks)),
+            h("div", {}, h("div", { class: "muted small" }, "Position"), h("h2", {}, c.result.position ? `${c.result.position} / ${c.class_size}` : "—")), h("div", {}, h("div", { class: "muted small" }, "Result"), h("h2", {}, badge(c.result.result.toLowerCase(), c.result.result)))),
+          h("div", { class: "row between", style: { marginTop: "3rem" } }, h("div", {}, "______________________", h("div", { class: "small" }, "Class teacher")), h("div", {}, "______________________", h("div", { class: "small" }, "Nazim-e-Taleemat")), h("div", {}, "______________________", h("div", { class: "small" }, "Mohtamim")))))
+          : empty("No published results yet."));
+    });
+  </script>
+</Portal>

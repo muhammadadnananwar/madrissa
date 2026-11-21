@@ -1,0 +1,27 @@
+---
+import Print from "../../layouts/Print.astro";
+---
+<Print title="Payslip">
+  <script>
+    import { get } from "../../lib/api";
+    import { requireUser } from "../../lib/guard";
+    import { clear, fmtDate, fmtMoney, h, param } from "../../lib/ui";
+    requireUser().then(async () => {
+      const d = await get(`finance/payslips/${param("id")}/print/`);
+      const c = d.institution.currency, e = d.employee;
+      const comps = d.breakdown?.components || [];
+      const line = (label: string, v: any) => h("tr", {}, h("td", {}, label), h("td", { class: "num" }, fmtMoney(v, c)));
+      clear(document.getElementById("doc")!, h("div", { class: "print-page" },
+        h("div", { class: "print-head" }, h("div", {}, h("h2", { style: { margin: 0 } }, d.institution.name), h("div", { class: "small muted" }, d.institution.address)), h("div", { class: "right" }, h("strong", {}, "SALARY SLIP"), h("div", {}, new Date(d.month).toLocaleDateString(undefined, { month: "long", year: "numeric" })))),
+        h("dl", { class: "kv" }, h("dt", {}, "Employee"), h("dd", {}, `${e.name} (${e.employee_no})`), h("dt", {}, "Designation"), h("dd", {}, e.designation), h("dt", {}, "Department"), h("dd", {}, e.department || "—"),
+          h("dt", {}, "CNIC"), h("dd", {}, e.cnic || "—"), h("dt", {}, "Bank"), h("dd", {}, e.bank || "—"), h("dt", {}, "Attendance"), h("dd", {}, `${d.present_days} present of ${d.working_days} working days · ${d.unpaid_leave_days} unpaid leave day(s)`)),
+        h("div", { class: "grid cols-2", style: { marginTop: "1rem" } },
+          h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Earnings"), h("th", { class: "num" }, ""))), h("tbody", {}, line("Basic salary", d.basic),
+            comps.filter((x: any) => x.kind === "allowance").map((x: any) => line(x.title, x.amount)), Number(d.bonus) ? line("Bonus", d.bonus) : null)),
+          h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Deductions"), h("th", { class: "num" }, ""))), h("tbody", {}, comps.filter((x: any) => x.kind === "deduction").map((x: any) => line(x.title, x.amount)),
+            line(`Absence / unpaid leave (${d.breakdown?.absent_days ?? 0} absent)`, d.absence_deduction), line("Advance / qarz recovery", d.advance_deduction)))),
+        h("div", { class: "card", style: { marginTop: "1rem", textAlign: "center" } }, h("div", { class: "muted" }, "Net salary"), h("h1", {}, fmtMoney(d.net, c)), h("div", { class: "small" }, `${d.status}${d.paid_on ? ` · paid ${fmtDate(d.paid_on)} via ${d.method}` : ""}`)),
+        h("div", { class: "row between", style: { marginTop: "3rem" } }, h("span", {}, "______________ Accountant"), h("span", {}, "______________ Employee"))));
+    });
+  </script>
+</Print>

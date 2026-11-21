@@ -1,0 +1,72 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Quiz builder">
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { del, get, patch, post } from "../../lib/api";
+    import { openForm } from "../../lib/crud";
+    import { ready } from "../../lib/shell";
+    import { busy, clear, confirmDialog, empty, h, modal, param, toast } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    const quizId = Number(param("id"));
+    const KINDS = [["mcq", "Multiple choice (one answer)"], ["multi", "Multiple choice (many answers)"], ["true_false", "True / False"], ["short", "Short answer (manual grading)"]];
+
+    function editor(q: any | null, order: number, done: () => void) {
+      const text = h("textarea", {}, q?.text || "");
+      const kind = h("select", {}, KINDS.map(([v, l]) => h("option", { value: v, selected: q?.kind === v }, l)));
+      const marks = h("input", { type: "number", value: q?.marks ?? 1, min: 0, step: "any" });
+      const expl = h("textarea", { placeholder: "Explanation shown after submission (optional)" }, q?.explanation || "");
+      const choices: { id?: number; text: string; is_correct: boolean }[] = (q?.choices || []).map((c: any) => ({ ...c }));
+      if (!q) choices.push({ text: "", is_correct: true }, { text: "", is_correct: false });
+      const list = h("div", { class: "stack" });
+      const draw = () => {
+        if (kind.value === "short") return clear(list, h("p", { class: "muted" }, "Students type an answer; you grade it manually."));
+        if (kind.value === "true_false" && !choices.length) choices.push({ text: "True", is_correct: true }, { text: "False", is_correct: false });
+        clear(list, choices.map((c, i) => h("div", { class: "row" },
+          h("input", { type: kind.value === "multi" ? "checkbox" : "radio", name: "correct", checked: c.is_correct, title: "Correct answer",
+            onchange: (e: any) => { if (kind.value !== "multi") choices.forEach((x) => (x.is_correct = false)); c.is_correct = e.target.checked; } }),
+          h("input", { value: c.text, placeholder: `Option ${i + 1}`, style: { flex: 1 }, oninput: (e: any) => (c.text = e.target.value) }),
+          h("button", { class: "btn sm ghost", onclick: () => { choices.splice(i, 1); draw(); } }, "✕"))),
+          h("button", { class: "btn sm", onclick: () => { choices.push({ text: "", is_correct: false }); draw(); } }, "+ Option"));
+      };
+      kind.onchange = draw;
+      draw();
+      const save = h("button", { class: "btn primary" }, "Save question");
+      const m = modal(q ? "Edit question" : "New question", h("div", {},
+        h("div", { class: "field" }, h("label", {}, "Question"), text), h("div", { class: "form-grid" }, h("div", { class: "field" }, h("label", {}, "Type"), kind), h("div", { class: "field" }, h("label", {}, "Marks"), marks)),
+        h("div", { class: "field" }, h("label", {}, "Options (tick the correct one)"), list), h("div", { class: "field" }, h("label", {}, "Explanation"), expl)), { wide: true, actions: [save] });
+      save.onclick = async () => {
+        if (!text.value.trim()) return toast("Write the question.", "error");
+        if (kind.value !== "short" && !choices.some((c) => c.is_correct && c.text.trim())) return toast("Mark at least one correct option.", "error");
+        await busy(save, async () => {
+          const body = { quiz: quizId, text: text.value, kind: kind.value, marks: marks.value, explanation: expl.value, order: q?.order ?? order };
+          const saved = q ? await patch(`questions/${q.id}/`, body) : await post("questions/", body);
+          const keep = new Set<number>();
+          if (kind.value !== "short") for (const c of choices.filter((c) => c.text.trim())) {
+            const r = c.id ? await patch(`choices/${c.id}/`, { text: c.text, is_correct: c.is_correct }) : await post("choices/", { question: saved.id, text: c.text, is_correct: c.is_correct });
+            keep.add(r.id);
+          }
+          for (const old of q?.choices || []) if (!keep.has(old.id)) await del(`choices/${old.id}/`);
+          return { detail: "Question saved." };
+        });
+        m.close(); done();
+      };
+    }
+
+    async function load() {
+      const quiz = await get(`quizzes/${quizId}/`);
+      const qs = (await get("questions/", { quiz: quizId, page_size: 200, ordering: "order" })).results;
+      const allChoices = qs.length ? (await get("choices/", { question__quiz: quizId, page_size: 1000 })).results : [];
+      for (const q of qs) q.choices = allChoices.filter((c: any) => c.question === q.id);
+      clear(root, h("div", { class: "page-head" }, h("div", {}, h("a", { href: `/lms/course?id=${quiz.course}`, class: "small" }, "← Course"), h("h1", {}, quiz.title), h("p", {}, `${qs.length} questions · total ${qs.reduce((a: number, q: any) => a + Number(q.marks), 0)} marks`)),
+        h("div", { class: "row" }, h("button", { class: "btn", onclick: () => openForm("quizzes", quiz, load) }, "Quiz settings"), h("button", { class: "btn primary", onclick: () => editor(null, qs.length + 1, load) }, "+ Question"))),
+        qs.length ? h("div", { class: "stack" }, qs.map((q: any, i: number) => h("div", { class: "card" },
+          h("div", { class: "card-head" }, h("h3", {}, `Q${i + 1}. ${q.text}`), h("div", { class: "row" }, h("span", { class: "small muted" }, `${q.kind_display} · ${q.marks} mark(s)`),
+            h("button", { class: "btn sm", onclick: () => editor(q, i + 1, load) }, "Edit"),
+            h("button", { class: "btn sm danger", onclick: async () => { if (await confirmDialog("Delete question?", "Delete", true)) { await del(`questions/${q.id}/`); load(); } } }, "Delete"))),
+          q.choices.length ? h("ul", { class: "list" }, q.choices.map((c: any) => h("li", {}, c.text, c.is_correct ? "✓ correct" : ""))) : null))) : empty("No questions yet. Add the first one."));
+    }
+    ready.then(load);
+  </script>
+</Portal>

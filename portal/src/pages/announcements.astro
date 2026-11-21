@@ -1,0 +1,31 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="Notice board">
+  <div class="page-head"><div><h1>Notice board</h1><p>Announcements addressed to you.</p></div><div id="act"></div></div>
+  <div id="feed" class="stack"><div class="spinner"></div></div>
+  <script>
+    import { get } from "../lib/api";
+    import { getMeta, openForm } from "../lib/crud";
+    import { ready } from "../lib/shell";
+    import { badge, clear, empty, fmtDateTime, h } from "../lib/ui";
+    const feed = document.getElementById("feed")!;
+    async function load() {
+      const rows = await get("communication/feed/");
+      clear(feed, rows.length ? rows.map((a: any) => h("article", { class: "card" },
+        h("div", { class: "row between" }, h("h2", {}, a.is_pinned ? "📌 " : "", a.title), a.priority !== "normal" ? badge(a.priority) : null),
+        h("div", { class: "muted small" }, `${a.by} · ${fmtDateTime(a.publish_at)}${a.section ? " · " + a.section : ""}`),
+        h("p", { style: { whiteSpace: "pre-wrap" } }, a.body),
+        a.attachment ? h("a", { href: a.attachment, target: "_blank" }, "📎 Attachment") : null)) : empty("No announcements."));
+    }
+    ready.then(async () => {
+      load();
+      try {
+        const m = await getMeta("announcements");
+        if (m.can_create) document.getElementById("act")!.append(
+          h("a", { class: "btn", href: "/m/announcements" }, "Manage"),
+          h("button", { class: "btn primary", onclick: () => openForm("announcements", null, load) }, "New announcement"));
+      } catch { /* read-only */ }
+    });
+  </script>
+</Portal>

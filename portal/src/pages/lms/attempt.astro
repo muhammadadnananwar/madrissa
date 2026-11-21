@@ -1,0 +1,28 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Quiz attempt">
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { badge, busy, clear, h, param } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    async function load() {
+      const d = await get(`quiz-attempts/${param("id")}/review/`);
+      const grades = new Map<number, HTMLInputElement>();
+      const save = h("button", { class: "btn primary" }, "Save grades");
+      save.onclick = async () => { if (await busy(save, () => post(`quiz-attempts/${d.attempt}/grade/`, { answers: [...grades.entries()].map(([answer_id, el]) => ({ answer_id, marks: el.value || 0 })) }))) load(); };
+      clear(root, h("div", { class: "page-head" }, h("div", {}, h("a", { href: "javascript:history.back()", class: "small" }, "← Back"), h("h1", {}, d.quiz), h("p", {}, d.student)),
+        h("div", { class: "card" }, h("div", { class: "stat" }, h("div", {}, h("div", { class: "val" }, `${d.score} / ${d.max_score}`), h("div", { class: "lbl" }, d.status === "graded" ? (d.passed ? "Passed" : "Not passed") : "Awaiting manual grading"))))),
+        h("div", { class: "stack" }, d.answers.map((a: any, i: number) => h("div", { class: "card" },
+          h("div", { class: "row between" }, h("h3", {}, `Q${i + 1}. ${a.question}`), a.is_correct === true ? badge("pass", "correct") : a.is_correct === false ? badge("fail", "incorrect") : badge("pending", "to grade")),
+          a.kind === "short" ? h("div", {}, h("p", { style: { whiteSpace: "pre-wrap" } }, a.text_answer || h("em", {}, "(no answer)")),
+            d.is_manager ? h("div", { class: "row" }, "Marks:", (() => { const el = h("input", { type: "number", class: "inline-input", style: { width: "80px" }, value: a.marks_awarded ?? "", max: a.marks, min: 0, step: "any" }); grades.set(a.answer_id, el); return el; })(), `/ ${a.marks}`) : h("div", { class: "muted" }, a.marks_awarded == null ? "Not graded yet" : `${a.marks_awarded} / ${a.marks}`))
+            : h("ul", { class: "list" }, a.choices.map((c: any) => h("li", {}, h("span", {}, a.selected.includes(c.id) ? "◉ " : "○ ", c.text), c.is_correct ? badge("pass", "correct answer") : ""))),
+          a.explanation ? h("div", { class: "alert" }, a.explanation) : null)),
+          d.is_manager && grades.size ? save : null));
+    }
+    ready.then(load);
+  </script>
+</Portal>

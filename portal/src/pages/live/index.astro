@@ -1,0 +1,78 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Live classes">
+  <div class="page-head"><div><h1>Live classes</h1><p>Online classes through Jitsi Meet (free), Google Meet or Zoom. Joining from here marks attendance automatically.</p></div><div class="row" id="act"></div></div>
+  <div id="prov"></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../../lib/api";
+    import { openForm } from "../../lib/crud";
+    import { remoteSelect } from "../../lib/form";
+    import { TEACHING, hasRole } from "../../lib/roles";
+    import { ready } from "../../lib/shell";
+    import { badge, busy, clear, fmtDateTime, h, modal, param, table, tabs, today } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+
+    function recurring(defaults: any = {}) {
+      const title = h("input", { placeholder: "e.g. Online Tajweed class" });
+      const section = remoteSelect("sections", null);
+      const course = remoteSelect("courses", defaults.course || null);
+      const subject = remoteSelect("subjects", null);
+      const provider = h("select", {}, [["jitsi", "Jitsi Meet (free)"], ["google_meet", "Google Meet"], ["zoom", "Zoom"]].map(([v, l]) => h("option", { value: v }, l)));
+      const time = h("input", { type: "time", value: "16:00" });
+      const dur = h("input", { type: "number", value: 45, min: 5 });
+      const start = h("input", { type: "date", value: today() });
+      const end = h("input", { type: "date" });
+      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => h("label", { style: { fontWeight: 500 } }, h("input", { type: "checkbox", value: i }), " ", d));
+      const go = h("button", { class: "btn primary" }, "Create schedule");
+      const m = modal("Weekly schedule", h("div", { class: "form-grid" },
+        h("div", { class: "field full" }, h("label", {}, "Title"), title), h("div", { class: "field" }, h("label", {}, "Section"), section), h("div", { class: "field" }, h("label", {}, "Course (optional)"), course),
+        h("div", { class: "field" }, h("label", {}, "Subject"), subject), h("div", { class: "field" }, h("label", {}, "Provider"), provider),
+        h("div", { class: "field" }, h("label", {}, "Time"), time), h("div", { class: "field" }, h("label", {}, "Duration (minutes)"), dur),
+        h("div", { class: "field" }, h("label", {}, "From"), start), h("div", { class: "field" }, h("label", {}, "Until"), end),
+        h("div", { class: "field full" }, h("label", {}, "Days"), h("div", { class: "row" }, days))), { wide: true, actions: [go] });
+      go.onclick = async () => {
+        const r = await busy(go, () => post("liveclasses/recurring/", {
+          title: title.value, section: (section as any).getValue(), course: (course as any).getValue(), subject: (subject as any).getValue(), provider: provider.value,
+          time: time.value, duration_minutes: Number(dur.value), start_date: start.value, end_date: end.value,
+          weekdays: days.map((d) => d.querySelector("input")!).filter((i) => i.checked).map((i) => Number(i.value)) }));
+        if (r) { m.close(); load("upcoming"); }
+      };
+    }
+
+    let current = "upcoming";
+    const body = h("div", {});
+    async function load(scope = current) {
+      current = scope;
+      const rows = await get("liveclasses/upcoming/", { scope });
+      const now = Date.now();
+      clear(body, h("div", { class: "card flush" }, table([
+        { label: "Class", render: (l: any) => h("div", {}, h("strong", {}, l.title), h("div", { class: "small muted" }, [l.subject, l.section, l.course].filter(Boolean).join(" · "))) },
+        { label: "When", render: (l: any) => h("div", {}, fmtDateTime(l.scheduled_start), h("div", { class: "small muted" }, `${l.duration_minutes} min`)) },
+        { label: "Teacher", render: (l: any) => l.teacher },
+        { label: "Platform", render: (l: any) => h("div", {}, l.provider_display, l.provider_error ? h("div", { class: "small", style: { color: "var(--danger)" } }, l.provider_error) : null) },
+        { label: "Status", render: (l: any) => badge(l.status) },
+        { label: "", render: (l: any) => scope === "upcoming"
+          ? h("a", { class: `btn sm ${l.status === "live" || new Date(l.opens_at).getTime() <= now ? "primary" : ""}`, href: `/live/room?id=${l.id}` }, l.can_manage ? "Start / open" : "Join")
+          : l.recording_url ? h("a", { class: "btn sm", href: l.recording_url, target: "_blank" }, "Recording") : h("a", { class: "btn sm ghost", href: `/live/room?id=${l.id}` }, "Details") },
+      ], rows, { emptyText: scope === "upcoming" ? "No upcoming live classes." : "No past classes." })));
+    }
+
+    ready.then(async (u) => {
+      if (hasRole(u, TEACHING)) {
+        const course = param("course");
+        document.getElementById("act")!.append(
+          h("button", { class: "btn", onclick: () => recurring({ course }) }, "Weekly schedule"),
+          h("button", { class: "btn primary", onclick: () => openForm("live-classes", null, () => load("upcoming"), course ? { course: Number(course) } : {}) }, "Schedule a class"));
+        try {
+          const p = await get("liveclasses/providers/");
+          const missing = ["google_meet", "zoom"].filter((k) => !p[k].configured);
+          document.getElementById("prov")!.append(h("div", { class: "alert" }, `Default platform: ${p.default}. Jitsi (${p.jitsi.domain}) is ready to use for free.`,
+            missing.length ? ` ${missing.map((m) => m.replace("_", " ")).join(" & ")} not configured — ask the administrator to add API keys in the server .env.` : ""));
+        } catch { /* ignore */ }
+      }
+      clear(root, tabs([{ key: "upcoming", label: "Upcoming" }, { key: "past", label: "Past & recordings" }], (k) => load(k)), body);
+    });
+  </script>
+</Portal>

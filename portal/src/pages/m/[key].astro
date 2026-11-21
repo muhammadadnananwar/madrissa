@@ -1,0 +1,13 @@
+---
+import Portal from "../../layouts/Portal.astro";
+const { key } = Astro.params;
+---
+<Portal title="Records">
+  <div id="crud" data-key={key}></div>
+  <script>
+    import { mountCrud } from "../../lib/crud";
+    import { ready } from "../../lib/shell";
+    const el = document.getElementById("crud")!;
+    ready.then(() => mountCrud(el, el.dataset.key!));
+  </script>
+</Portal>

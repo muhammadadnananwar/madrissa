@@ -1,0 +1,37 @@
+{
+ "dept-ib.jpg": {
+  "photographer": "Indra Projects",
+  "source": "https://unsplash.com/photos/rH-PGRm6_vY",
+  "license": "Unsplash License"
+ },
+ "dept-tq.jpg": {
+  "photographer": "Aoun Abbas",
+  "source": "https://unsplash.com/photos/97o4XH0htUs",
+  "license": "Unsplash License"
+ },
+ "dept-tj.jpg": {
+  "photographer": "GR Stocks",
+  "source": "https://unsplash.com/photos/3enqRtcWYzs",
+  "license": "Unsplash License"
+ },
+ "dept-dn.jpg": {
+  "photographer": "Yuz Ayub",
+  "source": "https://unsplash.com/photos/rsBcEurM-7M",
+  "license": "Unsplash License"
+ },
+ "dept-tfh.jpg": {
+  "photographer": "Bimbingan Islam",
+  "source": "https://unsplash.com/photos/HuMCLXl-qeg",
+  "license": "Unsplash License"
+ },
+ "dept-di.jpg": {
+  "photographer": "Haci",
+  "source": "https://unsplash.com/photos/pbLwrbPxMOQ",
+  "license": "Unsplash License"
+ },
+ "dept-ni.jpg": {
+  "photographer": "Omair Parvez",
+  "source": "https://unsplash.com/photos/o6ka1Lpk81U",
+  "license": "Unsplash License"
+ }
+}

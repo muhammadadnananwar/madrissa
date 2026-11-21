@@ -1,0 +1,10 @@
+---
+import Blank from "./Blank.astro";
+interface Props { title: string }
+const { title } = Astro.props;
+---
+<Blank title={title}>
+  <div class="print-actions"><button class="btn primary" onclick="print()">Print</button> <button class="btn" onclick="history.back()">Back</button></div>
+  <div id="doc"><div class="spinner"></div></div>
+  <slot />
+</Blank>

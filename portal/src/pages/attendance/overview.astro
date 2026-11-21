@@ -1,0 +1,28 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Attendance overview">
+  <div class="page-head"><div><h1>Today's attendance</h1><p>Section-wise status across the madrasa.</p></div><input type="date" id="d" style="width:auto" /></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { badge, clear, h, statCard, table, today } from "../../lib/ui";
+    const root = document.getElementById("root")!, d = document.getElementById("d") as HTMLInputElement;
+    d.value = today();
+    async function load() {
+      const o = await get("attendance/overview/", { date: d.value });
+      const tot = o.sections.reduce((a: any, s: any) => { a.str += s.strength; a.p += (s.summary.present || 0) + (s.summary.late || 0); a.a += s.summary.absent || 0; return a; }, { str: 0, p: 0, a: 0 });
+      clear(root, h("div", { class: "grid cols-4", style: { marginBottom: "1rem" } },
+        statCard("Students present", `${tot.p}/${tot.str}`, "check"), statCard("Absent", tot.a, "alert", { tone: "warn" }),
+        statCard("Sections not marked", o.sections.filter((s: any) => !s.marked).length, "grid", { tone: "warn" }),
+        statCard("Staff present", `${(o.staff.present || 0) + (o.staff.late || 0)}/${o.staff_total}`, "briefcase")),
+        h("div", { class: "card flush" }, table([{ label: "Section", render: (s: any) => s.label }, { label: "Class teacher", render: (s: any) => s.teacher },
+          { label: "Strength", render: (s: any) => s.strength, cls: "num" }, { label: "Present", render: (s: any) => (s.summary.present || 0) + (s.summary.late || 0), cls: "num" },
+          { label: "Absent", render: (s: any) => s.summary.absent || 0, cls: "num" }, { label: "Leave", render: (s: any) => s.summary.leave || 0, cls: "num" },
+          { label: "Status", render: (s: any) => s.marked ? badge("completed", "Marked") : h("a", { href: `/attendance?section=${s.section}&date=${d.value}` }, badge("pending", "Not marked")) }], o.sections)));
+    }
+    d.onchange = load;
+    ready.then(load);
+  </script>
+</Portal>

@@ -1,0 +1,143 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Course">
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { api, del, get, post } from "../../lib/api";
+    import { openForm } from "../../lib/crud";
+    import { ready } from "../../lib/shell";
+    import { badge, busy, clear, confirmDialog, empty, esc, fmtDateTime, h, modal, param, table, tabs } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    const id = param("id");
+
+    function embed(url: string) {
+      const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/);
+      if (yt) return h("iframe", { src: `https://www.youtube-nocookie.com/embed/${yt[1]}`, style: { width: "100%", aspectRatio: "16/9", border: 0, borderRadius: "8px" }, allowfullscreen: true });
+      if (/\.(mp3|m4a|ogg|wav)$/i.test(url)) return h("audio", { src: url, controls: true, style: { width: "100%" } });
+      if (/\.(mp4|webm)$/i.test(url)) return h("video", { src: url, controls: true, style: { width: "100%" } });
+      return h("a", { href: url, target: "_blank", class: "btn" }, "Open link ↗");
+    }
+
+    ready.then(async (user) => {
+      let o: any;
+      const body = h("div", {});
+      const reload = async (tab?: string) => { o = await get(`courses/${id}/outline/`); render(tab); };
+
+      function lessonView(l: any) {
+        const done = h("button", { class: `btn ${l.completed ? "success" : "primary"}` }, l.completed ? "✓ Completed" : "Mark as complete");
+        done.onclick = async () => { const r = await busy(done, () => post(`lessons/${l.id}/complete/`, l.completed ? { undo: true } : {})); if (r) { m.close(); reload("lessons"); } };
+        const m = modal(l.title, h("div", { class: "stack" },
+          l.media_url ? embed(l.media_url) : null,
+          l.file ? (/\.pdf$/i.test(l.file) ? h("iframe", { src: l.file, style: { width: "100%", height: "60vh", border: 0 } }) : h("a", { class: "btn", href: l.file, target: "_blank" }, "Download file")) : null,
+          l.content ? h("div", { html: l.content }) : null), { wide: true, actions: user.role === "student" ? [done] : [] });
+      }
+
+      const sections: Record<string, () => any> = {
+        lessons: () => h("div", { class: "stack" },
+          o.is_manager ? h("div", { class: "row" }, h("button", { class: "btn primary", onclick: () => openForm("modules", null, () => reload("lessons"), { course: o.course.id, order: o.modules.length + 1 }) }, "+ Module"), h("a", { class: "btn", href: `/m/lessons?module__course=${o.course.id}` }, "Manage lessons")) : null,
+          o.modules.length ? o.modules.map((m: any) => h("div", { class: "card" },
+            h("div", { class: "card-head" }, h("h3", {}, `${m.order}. ${m.title}`), o.is_manager ? h("div", { class: "row" },
+              h("button", { class: "btn sm", onclick: () => openForm("lessons", null, () => reload("lessons"), { module: m.id, order: m.lessons.length + 1 }) }, "+ Lesson"),
+              h("button", { class: "btn sm ghost", onclick: async () => openForm("modules", await get(`modules/${m.id}/`), () => reload("lessons")) }, "Edit")) : null),
+            m.description ? h("p", { class: "muted" }, m.description) : null,
+            m.lessons.length ? h("ul", { class: "list" }, m.lessons.map((l: any) => h("li", {},
+              h("a", { href: "#", onclick: (e: Event) => { e.preventDefault(); lessonView(l); } }, l.completed ? "✅ " : "▶ ", l.title, " ", h("span", { class: "muted small" }, `${l.kind}${l.duration_minutes ? ` · ${l.duration_minutes} min` : ""}`)),
+              o.is_manager ? h("span", { class: "row" }, !l.is_published ? badge("draft") : null, h("button", { class: "btn sm ghost", onclick: async () => openForm("lessons", await get(`lessons/${l.id}/`), () => reload("lessons")) }, "Edit")) : null))) : h("p", { class: "muted" }, "No lessons yet."))) : empty("No content yet.")),
+        assignments: () => h("div", { class: "stack" },
+          o.is_manager ? h("button", { class: "btn primary", onclick: () => openForm("assignments", null, () => reload("assignments"), { course: o.course.id }) }, "+ Assignment") : null,
+          o.assignments.length ? o.assignments.map((a: any) => h("div", { class: "card" },
+            h("div", { class: "card-head" }, h("h3", {}, a.title), h("span", { class: "small" }, `Due ${fmtDateTime(a.due_at)} · ${a.max_marks} marks `, a.overdue ? badge("overdue") : null)),
+            h("p", { style: { whiteSpace: "pre-wrap" } }, a.instructions), a.attachment ? h("a", { href: a.attachment, target: "_blank" }, "📎 Attachment") : null,
+            o.is_manager ? h("div", { class: "row" }, h("span", {}, `${a.submission_count} submission(s), ${a.ungraded} to grade`), h("button", { class: "btn sm primary", onclick: () => grading(a) }, "View & grade")) : submitBox(a))) : empty("No assignments.")),
+        quizzes: () => h("div", { class: "stack" },
+          o.is_manager ? h("button", { class: "btn primary", onclick: () => openForm("quizzes", null, () => reload("quizzes"), { course: o.course.id }) }, "+ Quiz") : null,
+          o.quizzes.length ? o.quizzes.map((q: any) => h("div", { class: "card" },
+            h("div", { class: "card-head" }, h("h3", {}, q.title), h("span", { class: "small muted" }, `${q.question_count} questions · ${q.time_limit_minutes ? q.time_limit_minutes + " min" : "no time limit"} · pass ${q.pass_percentage}%`)),
+            q.description ? h("p", {}, q.description) : null,
+            q.attempts.length ? table([{ label: "Attempt", render: (_: any, i: number) => i + 1 }, { label: "Score", render: (t: any) => `${t.score} / ${t.max_score}` }, { label: "Status", render: (t: any) => badge(t.status) }, { label: "Result", render: (t: any) => (t.status === "graded" ? badge(t.passed ? "passed" : "failed") : "—") }, { label: "", render: (t: any) => h("a", { href: `/lms/attempt?id=${t.id}` }, "Review") }], q.attempts) : null,
+            o.is_manager ? h("div", { class: "row" }, h("a", { class: "btn sm", href: `/lms/quiz-builder?id=${q.id}` }, "Edit questions"), h("a", { class: "btn sm", href: `/m/quiz-attempts?quiz=${q.id}` }, "Attempts"))
+              : user.role === "student" && q.attempts.length < q.max_attempts ? h("a", { class: "btn primary", href: `/lms/quiz?id=${q.id}` }, q.attempts.some((t: any) => t.status === "in_progress") ? "Resume quiz" : "Start quiz") : null)) : empty("No quizzes.")),
+        discussions: () => discussions(),
+        live: () => h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", {}, "Live classes"), o.is_manager ? h("a", { class: "btn sm primary", href: `/live?course=${o.course.id}` }, "Schedule") : null),
+          table([{ label: "Class", render: (l: any) => h("a", { href: `/live/room?id=${l.id}` }, l.title) }, { label: "When", render: (l: any) => fmtDateTime(l.scheduled_start) }, { label: "Status", render: (l: any) => badge(l.status) },
+            { label: "Recording", render: (l: any) => (l.recording_url ? h("a", { href: l.recording_url, target: "_blank" }, "Watch") : "—") }], o.live_classes)),
+        gradebook: () => gradebook(),
+      };
+
+      function submitBox(a: any) {
+        const s = a.submission;
+        if (user.role !== "student") return s ? h("div", {}, badge(s.status), s.marks != null ? ` ${s.marks}/${a.max_marks}` : "") : h("p", { class: "muted" }, "Not submitted.");
+        const text = h("textarea", { placeholder: "Your answer…" }, s?.text || "");
+        const file = h("input", { type: "file" });
+        const btn = h("button", { class: "btn primary" }, s ? "Resubmit" : "Submit");
+        btn.onclick = async () => {
+          const fd = new FormData(); fd.append("text", text.value); if (file.files?.[0]) fd.append("file", file.files[0]);
+          if (await busy(btn, () => api(`assignments/${a.id}/submit/`, { method: "POST", body: fd }))) reload("assignments");
+        };
+        return h("div", { class: "stack" },
+          s ? h("div", { class: `alert ${s.status === "graded" ? "good" : ""}` }, `Status: ${s.status}`, s.marks != null ? ` · Marks ${s.marks}/${a.max_marks}` : "", s.feedback ? h("div", {}, `Feedback: ${s.feedback}`) : null, s.file ? h("div", {}, h("a", { href: s.file, target: "_blank" }, "Your file")) : null) : null,
+          s?.status === "graded" ? null : h("div", {}, text, file, h("div", { style: { marginTop: ".5rem" } }, btn)));
+      }
+
+      async function grading(a: any) {
+        const d = await get(`assignments/${a.id}/submissions/`);
+        const m = modal(`Submissions — ${a.title}`, table([{ label: "Student", render: (r: any) => r.name },
+          { label: "Status", render: (r: any) => (r.submission ? badge(r.submission.status) : badge("pending", "missing")) },
+          { label: "Answer", render: (r: any) => (r.submission ? h("div", {}, h("div", { class: "small", style: { maxWidth: "320px", whiteSpace: "pre-wrap" } }, r.submission.text), r.submission.file ? h("a", { href: r.submission.file, target: "_blank" }, "file") : null) : "—") },
+          { label: "Marks", render: (r: any) => {
+            if (!r.submission) return "—";
+            const marks = h("input", { type: "number", class: "inline-input", style: { width: "70px" }, value: r.submission.marks ?? "", max: a.max_marks, min: 0, step: "any" });
+            const fb = h("input", { class: "inline-input", placeholder: "Feedback", value: r.submission.feedback || "" });
+            const save = h("button", { class: "btn sm primary" }, "Save");
+            save.onclick = () => busy(save, () => post(`submissions/${r.submission.id}/grade/`, { marks: marks.value, feedback: fb.value }));
+            return h("div", { class: "row" }, marks, `/ ${a.max_marks}`, fb, save);
+          } }], d.rows), { wide: true, onClose: () => reload("assignments") });
+        void m;
+      }
+
+      async function discussions() {
+        const box = h("div", { class: "stack" });
+        const threads = await get(`lms/courses/${o.course.id}/threads/`);
+        const newBtn = h("button", { class: "btn primary", onclick: () => openForm("discussion-threads", null, () => clear(box, h("div", { class: "spinner" })) && reload("discussions"), { course: o.course.id }) }, "Start a discussion");
+        const openThread = async (tid: number) => {
+          const t = await get(`lms/threads/${tid}/`);
+          const reply = h("textarea", { placeholder: "Write a reply…" });
+          const send = h("button", { class: "btn primary" }, "Reply");
+          const m = modal(t.title, h("div", { class: "stack" }, h("div", { class: "card" }, h("div", { class: "small muted" }, `${t.author} · ${fmtDateTime(t.created_at)}`), h("p", { style: { whiteSpace: "pre-wrap" } }, t.body)),
+            t.replies.map((r: any) => h("div", { class: "card" }, h("div", { class: "small muted" }, `${r.author} · ${fmtDateTime(r.created_at)}`), h("p", { style: { whiteSpace: "pre-wrap" } }, r.body),
+              r.mine ? h("button", { class: "btn sm ghost", onclick: async () => { if (await confirmDialog("Delete reply?")) { await del(`discussion-replies/${r.id}/`); m.close(); openThread(tid); } } }, "Delete") : null)),
+            t.is_locked ? h("div", { class: "alert" }, "This thread is locked.") : h("div", {}, reply, h("div", { style: { marginTop: ".5rem" } }, send))), { wide: true });
+          send.onclick = async () => { if (await busy(send, () => post("discussion-replies/", { thread: tid, body: reply.value }))) { m.close(); openThread(tid); } };
+        };
+        clear(box, newBtn, threads.length ? h("div", { class: "card flush" }, table([{ label: "Topic", render: (t: any) => h("a", { href: "#", onclick: (e: Event) => { e.preventDefault(); openThread(t.id); } }, t.is_pinned ? "📌 " : "", t.title) },
+          { label: "By", render: (t: any) => t.author }, { label: "Replies", render: (t: any) => t.replies, cls: "num" }, { label: "Started", render: (t: any) => fmtDateTime(t.created_at) }], threads)) : empty("No discussions yet."));
+        return box;
+      }
+
+      async function gradebook() {
+        const g = await get(`courses/${o.course.id}/gradebook/`);
+        return h("div", { class: "card flush" }, h("div", { class: "table-wrap" }, h("table", {},
+          h("thead", {}, h("tr", {}, h("th", {}, "Student"), h("th", {}, "Progress"), g.assignments.map((a: any) => h("th", { class: "num" }, `${a.title} (/${a.max})`)), g.quizzes.map((q: any) => h("th", { class: "num" }, q.title)))),
+          h("tbody", {}, g.rows.map((r: any) => h("tr", {}, h("td", {}, r.name), h("td", {}, `${r.progress}%`),
+            r.assignments.map((m: any, i: number) => h("td", { class: "num" }, m ?? (r.assignment_status[i] === "missing" ? "—" : r.assignment_status[i]))),
+            r.quizzes.map((q: any) => h("td", { class: "num" }, q ?? "—"))))))));
+      }
+
+      function render(tab?: string) {
+        const c = o.course;
+        const tabList = [{ key: "lessons", label: "Lessons" }, { key: "assignments", label: "Assignments" }, { key: "quizzes", label: "Quizzes" }, { key: "discussions", label: "Discussions" }, { key: "live", label: "Live classes" }];
+        if (o.is_manager) tabList.push({ key: "gradebook", label: "Gradebook" });
+        clear(root,
+          h("div", { class: "page-head" }, h("div", {}, h("a", { href: "/lms", class: "small" }, "← Courses"), h("h1", {}, c.title),
+            h("p", {}, [c.code, c.teacher, c.section, c.subject].filter(Boolean).join(" · "))),
+            h("div", { class: "row" }, o.is_manager ? h("button", { class: "btn", onclick: async () => openForm("courses", await get(`courses/${c.id}/`), () => reload()) }, "Edit course") : null)),
+          !o.is_manager && o.learner ? h("div", { class: "card", style: { marginBottom: "1rem" } }, h("div", { class: "row between" }, h("strong", {}, "Your progress"), h("span", {}, `${o.progress}%`)), h("div", { class: "progress" }, h("span", { style: { width: `${o.progress}%` } }))) : null,
+          c.description ? h("p", { class: "muted", html: esc(c.description) }) : null,
+          tabs(tabList, async (k) => clear(body, await sections[k]()), tab), body);
+      }
+      if (!id) return clear(root, empty("No course selected."));
+      try { await reload(); } catch (e: any) { clear(root, h("div", { class: "alert bad" }, e.message)); }
+    });
+  </script>
+</Portal>

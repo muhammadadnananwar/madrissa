@@ -1,0 +1,526 @@
+{
+ "DEPARTMENTS": [
+  {
+   "code": "IB",
+   "name": "Department of Islah-e-Batin (Spiritual Reformation)",
+   "nameUr": "شعبہ اصلاحِ باطن",
+   "faculty": "Ilm-e-Batin",
+   "shortDescription": "Spiritual reformation and purification of the self, under the patronage of Hazrat Mian Muhammad Saifi Hanafi (Damat Barakatuhum al-Aliyah).",
+   "shortDescriptionUr": "شعبہ اصلاحِ باطن: زیرِ سرپرستی شیخ العلماء، پیرِ طریقت حضرت میاں محمد سیفی حنفی (دامت برکاتہم العالیہ)",
+   "introduction": "Shaykh al-Ulama, Pir-e-Tariqat Hazrat Mian Muhammad Saifi Hanafi (Damat Barakatuhum al-Aliyah), authorised Khalifa of the central Astana Aliya Lakho Dair Sharif. Alhamdulillah! Thousands of people in Pakistan and abroad have had their lives transformed through the khanqahs and jamias he has established.\n\nزیرِ سرپرستی شیخ العلماء، پیرِ طریقت حضرت میاں محمد سیفی حنفی (دامت برکاتہم العالیہ)، خلیفہ مجاز مرکزی آستانہ عالیہ لکھو ڈیر شریف۔ (الحمدللہ! ملک و بیرونِ ملک آپ کی قائم کردہ خانقاہوں اور جامعات سے ہزاروں افراد کی زندگیاں بدل چکی ہیں)۔",
+   "headName": "Hazrat Mian Muhammad Saifi Hanafi (Damat Barakatuhum al-Aliyah)",
+   "headDesignation": "Patron (Sarparast) — Shaykh al-Ulama, Pir-e-Tariqat"
+  },
+  {
+   "code": "TQ",
+   "name": "Department of Tahfeez-ul-Quran (Quran Memorisation)",
+   "nameUr": "شعبہ تحفیظ القرآن",
+   "faculty": "Quranic Studies",
+   "shortDescription": "Memorisation of the Holy Quran (Hifz) under qualified qurra of the Jamia.",
+   "shortDescriptionUr": "شعبہ تحفیظ القرآن",
+   "headName": "Maulana Rizwan Faraz Muhammadi Saifi",
+   "headDesignation": "Nazim (Head), Tahfeez-ul-Quran and Tajweed & Qirat"
+  },
+  {
+   "code": "TJ",
+   "name": "Department of Tajweed & Qirat",
+   "nameUr": "شعبہ تجوید و قرأۃ",
+   "faculty": "Quranic Studies",
+   "shortDescription": "Correct recitation of the Holy Quran according to the rules of Tajweed and the art of Qirat.",
+   "shortDescriptionUr": "شعبہ تجوید و قرأۃ",
+   "headName": "Maulana Rizwan Faraz Muhammadi Saifi",
+   "headDesignation": "Nazim (Head), Tahfeez-ul-Quran and Tajweed & Qirat"
+  },
+  {
+   "code": "DN",
+   "name": "Department of Dars-e-Nizami",
+   "nameUr": "شعبہ درسِ نظامی",
+   "faculty": "Islamic Sciences",
+   "shortDescription": "The traditional Dars-e-Nizami (Alim) curriculum of Islamic sciences, up to Daura-e-Hadith.",
+   "shortDescriptionUr": "شعبہ درسِ نظامی"
+  },
+  {
+   "code": "TFH",
+   "name": "Takhassus fil Fiqh al-Hanafi (Specialisation in Hanafi Fiqh)",
+   "nameUr": "تخصص فی الفقہ الحنفی",
+   "faculty": "Islamic Sciences",
+   "shortDescription": "Advanced specialisation in Hanafi jurisprudence for graduates of Dars-e-Nizami.",
+   "shortDescriptionUr": "تخصص فی الفقہ الحنفی"
+  },
+  {
+   "code": "DI",
+   "name": "Darul Ifta Muhammadia Saifia",
+   "nameUr": "دارالافتاء محمدیہ سیفیہ",
+   "faculty": "Islamic Sciences",
+   "shortDescription": "The Jamia’s Darul Ifta, providing Shari’i guidance and answers (fatawa) to religious questions.",
+   "shortDescriptionUr": "دارالافتاء محمدیہ سیفیہ"
+  },
+  {
+   "code": "NI",
+   "name": "Department of Nashr-o-Isha’at (Publications)",
+   "nameUr": "شعبہ نشر و اشاعت",
+   "faculty": "Publications",
+   "shortDescription": "Publication and dissemination of religious literature and the Jamia’s teachings.",
+   "shortDescriptionUr": "شعبہ نشر و اشاعت"
+  },
+  {
+   "code": "OE",
+   "name": "Online Education",
+   "nameUr": "آن لائن تعلیم",
+   "faculty": "Online Learning",
+   "shortDescription": "Learn from home: online Dars-e-Nizami, Quran with Tajweed and short courses for men and women.",
+   "shortDescriptionUr": "آن لائن تعلیم گھر بیٹھے حاصل کریں!"
+  }
+ ],
+ "PROGRAMS": [
+  {
+   "code": "HQ",
+   "title": "Hifz-ul-Quran (Quran Memorisation)",
+   "titleUr": "تحفیظ القرآن",
+   "level": "quran",
+   "deliveryMode": "on_campus",
+   "dept": "TQ",
+   "featured": true,
+   "shortDescription": "Complete memorisation of the Holy Quran with Tajweed."
+  },
+  {
+   "code": "TQR",
+   "title": "Tajweed & Qirat",
+   "titleUr": "تجوید و قرأۃ",
+   "level": "quran",
+   "deliveryMode": "on_campus",
+   "dept": "TJ",
+   "featured": false,
+   "shortDescription": "Correct recitation of the Holy Quran and training in Qirat."
+  },
+  {
+   "code": "DN",
+   "title": "Dars-e-Nizami",
+   "titleUr": "درسِ نظامی",
+   "level": "dars_nizami",
+   "deliveryMode": "on_campus",
+   "dept": "DN",
+   "featured": true,
+   "shortDescription": "The traditional Alim course in Islamic sciences, up to Daura-e-Hadith."
+  },
+  {
+   "code": "TFH",
+   "title": "Takhassus fil Fiqh al-Hanafi",
+   "titleUr": "تخصص فی الفقہ الحنفی",
+   "level": "specialization",
+   "deliveryMode": "on_campus",
+   "dept": "TFH",
+   "featured": true,
+   "shortDescription": "Specialisation in Hanafi jurisprudence (fiqh) and fatwa."
+  },
+  {
+   "code": "ODN",
+   "title": "Online Dars-e-Nizami",
+   "titleUr": "آن لائن درسِ نظامی",
+   "level": "dars_nizami",
+   "deliveryMode": "online",
+   "dept": "OE",
+   "featured": true,
+   "shortDescription": "Study Dars-e-Nizami online from home."
+  },
+  {
+   "code": "QT",
+   "title": "Quran Education with Tajweed (Online)",
+   "titleUr": "تجوید کے ساتھ تعلیمِ قرآن",
+   "level": "quran",
+   "deliveryMode": "online",
+   "dept": "OE",
+   "featured": false,
+   "shortDescription": "Learn to read the Holy Quran correctly with Tajweed, online."
+  },
+  {
+   "code": "FSC",
+   "title": "Fahm-e-Shariat Course (Understanding the Shariah)",
+   "titleUr": "فہمِ شریعت کورس",
+   "level": "short_course",
+   "deliveryMode": "online",
+   "dept": "OE",
+   "featured": true,
+   "duration": "2 Years",
+   "audience": "Men & Women",
+   "shortDescription": "A two-year online course for men and women on understanding the Shariah."
+  },
+  {
+   "code": "TTC",
+   "title": "Tarjuma-o-Tafseer Course (Quran Translation & Exegesis)",
+   "titleUr": "ترجمہ و تفسیر کورس",
+   "level": "short_course",
+   "deliveryMode": "online",
+   "dept": "OE",
+   "featured": true,
+   "duration": "1 Year",
+   "audience": "Men & Women",
+   "shortDescription": "A one-year online course on the translation and tafseer of the Holy Quran."
+  },
+  {
+   "code": "FDC",
+   "title": "Fahm-e-Deen Course (Understanding the Deen)",
+   "titleUr": "فہمِ دین کورس",
+   "level": "short_course",
+   "deliveryMode": "online",
+   "dept": "OE",
+   "featured": false,
+   "duration": "6 Months",
+   "audience": "Men & Women",
+   "shortDescription": "A six-month online course on the essentials of the Deen."
+  },
+  {
+   "code": "IMC",
+   "title": "Ilm-ul-Meeras Course (Islamic Inheritance Law)",
+   "titleUr": "علمِ میراث کورس",
+   "level": "short_course",
+   "deliveryMode": "online",
+   "dept": "OE",
+   "featured": false,
+   "duration": "3 Months",
+   "audience": "Men & Women",
+   "classDays": "Saturday & Sunday only",
+   "shortDescription": "A three-month course on Islamic inheritance law, with classes on Saturdays and Sundays only."
+  }
+ ],
+ "FACULTY": [
+  {
+   "name": "Shaykh al-Hadith Allama Allah Bakhsh Taunsvi Muhammadi Saifi",
+   "nameUr": "شیخ الحدیث علامہ اللہ بخش تونسوی محمدی سیفی",
+   "designation": "Shaykh al-Hadith",
+   "designationUr": "شیخ الحدیث جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  },
+  {
+   "name": "Shaykh al-Hadith Allama Abdul Mannan Muhammadi Saifi",
+   "nameUr": "شیخ الحدیث علامہ عبدالمنان محمدی سیفی",
+   "designation": "Shaykh al-Hadith",
+   "designationUr": "شیخ الحدیث جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  },
+  {
+   "name": "Ustadh al-Ulama Mufti Farooq Ahmad Muhammadi Saifi",
+   "nameUr": "استاذ العلماء مفتی فاروق احمد محمدی سیفی",
+   "designation": "Nazim-e-Taleemat (Director of Education)",
+   "designationUr": "ناظم تعلیمات جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  },
+  {
+   "name": "Ustadh al-Ulama Maulana Sulaiman Nagdarvi Muhammadi Saifi",
+   "nameUr": "استاذ العلماء مولانا سلیمان نگدروی محمدی سیفی",
+   "designation": "Senior Teacher (Mudarris)",
+   "designationUr": "سینئر مدرس جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  },
+  {
+   "name": "Ustadh al-Ulama Maulana Azhar Muhammadi Saifi",
+   "nameUr": "استاذ العلماء مولانا اظہر محمدی سیفی",
+   "designation": "Teacher (Mudarris)",
+   "designationUr": "مدرس جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  },
+  {
+   "name": "Maulana Muhammad Amin Muhammadi Saifi",
+   "nameUr": "مولانا محمد امین محمدی سیفی",
+   "designation": "Teacher (Mudarris)",
+   "designationUr": "مدرس جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  },
+  {
+   "name": "Maulana Rizwan Faraz Muhammadi Saifi",
+   "nameUr": "مولانا رضوان فراز محمدی سیفی",
+   "designation": "Nazim (Head), Tahfeez-ul-Quran and Tajweed & Qirat",
+   "designationUr": "ناظم شعبہ تحفیظ القرآن و تجوید و قرأۃ",
+   "dept": "TQ"
+  },
+  {
+   "name": "Maulana Muhammad Arsalan Muhammadi Saifi",
+   "nameUr": "مولانا محمد ارسلان محمدی سیفی",
+   "designation": "Teacher (Mudarris)",
+   "designationUr": "مدرس جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  },
+  {
+   "name": "Qari Muhammad Abid Muhammadi Saifi",
+   "nameUr": "قاری محمد عابد محمدی سیفی",
+   "designation": "Senior Qari",
+   "designationUr": "سینئر قاری جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  },
+  {
+   "name": "Qari Muhammad Abdul Majeed Muhammadi Saifi",
+   "nameUr": "قاری محمد عبدالمجید محمدی سیفی",
+   "designation": "Teacher (Mudarris)",
+   "designationUr": "مدرس جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  },
+  {
+   "name": "Qari Saghir Ahmad Muhammadi Saifi",
+   "nameUr": "قاری صغیر احمد محمدی سیفی",
+   "designation": "Teacher (Mudarris)",
+   "designationUr": "مدرس جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  },
+  {
+   "name": "Qari Muhammad Shahid Muhammadi Saifi",
+   "nameUr": "قاری محمد شاہد محمدی سیفی",
+   "designation": "Teacher (Mudarris)",
+   "designationUr": "مدرس جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  },
+  {
+   "name": "Syed Muhammad Usman Shah Bukhari",
+   "nameUr": "سید محمد عثمان شاہ بخاری",
+   "designation": "Deputy Nazim, Tahfeez-ul-Quran and Tajweed & Qirat",
+   "designationUr": "نائب ناظم شعبہ تحفیظ القرآن و تجوید و قرأۃ",
+   "dept": "TQ"
+  },
+  {
+   "name": "Qari Muhammad Ramzan Muhammadi Saifi",
+   "nameUr": "قاری محمد رمضان محمدی سیفی",
+   "designation": "Teacher (Mudarris)",
+   "designationUr": "مدرس جامعہ محمدیہ سیفیہ راوی ریان شریف"
+  }
+ ],
+ "RULES_PAGE": {
+  "title": "Rules & Regulations",
+  "slug": "rules-and-regulations",
+  "summary": "The rules and regulations of Jamia Muhammadia Saifia that every student agrees to follow (جامعہ کے قواعد و ضوابط).",
+  "content": "## Rules & Regulations of the Jamia\n\n1. All students must offer the five daily prayers in congregation and observe all other commandments of the Shariah.\n\n2. Students’ appearance — beard, haircut, dress, etc. — must be in accordance with the Sunnah of the Prophet ﷺ.\n\n3. Good manners and fair dealing with the teachers, the Jamia staff and fellow students are the adornment of a student.\n\n4. All students must adhere to the true path of Ahl-e-Sunnat wa Jama’at (the teachings of Mujaddid Alf-e-Sani and A’la Hazrat) and strive to promote and spread it.\n\n5. All students shall deposit the monthly fee before the 10th of each calendar (English) month. The fee of a student who obtains 90% marks will be waived.\n\n6. A student who remains absent from the Jamia for more than one week without informing will have his name struck off.\n\n7. No political or un-Islamic activity of any kind is permitted inside the Jamia.\n\n8. Committing any un-Islamic or immoral act (abusive language, fighting, smoking, watching films, indecency, etc.) will be punished and, depending on the nature of the offence, may result in the student’s name being struck off.\n\n9. Every student must take care of the Jamia’s books and other belongings. In case of damage, payment at the current market price is required.\n\n10. Repeated failure in the Jamia’s quarterly, half-yearly and annual examinations may result in the student’s name being struck off.\n\n11. Participation in the Jamia’s annual, monthly and weekly Bazm-e-Adab and other co-curricular activities is compulsory for every student.\n\n12. The institution takes no responsibility for any student’s involvement in negative activities outside the madrasa; a student involved in negative activities will be liable to disciplinary action.\n\n13. In the event of any accident, or if a student leaves or runs away from the madrasa without informing, the institution will not be responsible in any way.\n\n14. No student is allowed to keep high-value items, excessive cash, items of amusement and play, or any kind of weapon (light or heavy) in his possession.\n\n15. On my own behalf, I appoint the Nazim/Muhtamim of the Jamia as my agent (wakeel) for all amounts given to the Jamia (obligatory and voluntary charity — sadaqat-e-wajiba wa nafila); he may spend them on the Jamia’s expenses wherever he deems fit.\n\nNote: Attested copies of the certificates of all examinations passed, a photocopy of your own national identity card (CNIC / B-Form) and a copy of your father’s / guardian’s identity card must be attached with every admission form. Instructions issued by the Jamia from time to time will also be binding.\n\nDeclaration: I solemnly declare that I will abide by the above rules and regulations.\n\nFor contact with the institution: 0341-4212248, 0302-1747004\n\n## جامعہ کے قواعد و ضوابط (اردو متن)\n\n1۔ تمام طلبہ کے نمازِ پنجگانہ باجماعت اور دیگر احکامِ شرعیہ کی پابندی لازمی ہوگی۔\n\n2۔ طلبہ کی وضع قطع، داڑھی، حجامت، لباس وغیرہ سنتِ نبویہ کے مطابق ہونا ضروری ہے۔\n\n3۔ اساتذہ و اراکینِ جامعہ اور ساتھی طلبہ کے ساتھ خوش اخلاقی اور حسنِ معاملت طالبِ علم کا زیور ہوتا ہے۔\n\n4۔ تمام طلبہ کا مسلک حقہ اہلسنت و جماعت (تعلیماتِ مجدد الف ثانی، اعلیٰ حضرت) کا پابند ہونا اور اس کی ترویج و اشاعت کے لئے کوشاں رہنا ضروری ہے۔\n\n5۔ تمام طلباء ماہانہ فیس انگریزی ماہ کی 10 تاریخ سے پہلے پہلے جمع کروائیں گے۔ 90 فیصد نمبر حاصل کرنے والے طالبِ علم کی فیس معاف کر دی جائے گی۔\n\n6۔ ایک ہفتہ سے زائد بغیر اطلاع جامعہ سے غیر حاضر رہنے پر نام خارج کر دیا جائے گا۔\n\n7۔ جامعہ کے اندر کسی قسم کی سیاسی اور غیر شرعی سرگرمی کی اجازت نہیں ہوگی۔\n\n8۔ کسی بھی غیر شرعی اور غیر اخلاقی (گالی گلوچ، لڑائی جھگڑا، سگریٹ نوشی، فلم بینی، فحاشی وغیرہ) کے ارتکاب پر سزا اور جرم کی نوعیت کے مطابق نام خارج کیا جا سکتا ہے۔\n\n9۔ جامعہ کی کتب اور دیگر سامان کی حفاظت ہر طالبِ علم کے لئے ضروری ہے۔ نقصان کی صورت میں مارکیٹ میں موجودہ قیمت کے مطابق ادائیگی کرنا ضروری ہے۔\n\n10۔ جامعہ کے سہ ماہی، ششماہی، اور سالانہ امتحانات میں مسلسل ناکامی پر نام خارج کیا جا سکتا ہے۔\n\n11۔ جامعہ کے سالانہ، ماہانہ، ہفت روزہ بزمِ ادب اور دیگر ہم نصابی سرگرمیوں میں شرکت ہر طالبِ علم کے لئے ضروری ہے۔\n\n12۔ کسی طالبِ علم کی بیرونِ مدرسہ کسی قسم کی منفی سرگرمیوں میں ملوث ہونے کی ادارہ ذمہ داری نہیں لیتا، البتہ منفی سرگرمیوں میں ملوث ہونے والا تادیبی کارروائی کا مجاز ہوگا۔\n\n13۔ کسی بھی ناگہانی حادثے کی شکل میں طالب کے بلا اطلاع مدرسہ چھوڑنے یا بھاگ جانے کی صورت میں ادارہ کسی قسم کا ذمہ دار نہیں ہوگا۔\n\n14۔ کسی بھی طالبِ علم کو اپنے قبضے میں زیادہ مالیت کی اشیاء، ضرورت سے زیادہ نقدی، سامانِ لہو و لعب اور کسی قسم کا ہلکا بھاری اسلحہ رکھنے کی اجازت نہیں ہوگی۔\n\n15۔ میں اپنی طرف سے جامعہ کے ناظم/مہتمم کو جامعہ میں دی جانے والی جملہ رقوم (صدقاتِ واجبہ و نافلہ) کا وکیل بناتا ہوں، وہ جامعہ کے مصارف میں جہاں چاہیں اسے خرچ کر سکتے ہیں۔\n\nنوٹ: ہر فارم داخلہ کے ساتھ پاس کردہ امتحانات کی اسناد کی مصدقہ نقول، اپنے قومی شناختی کارڈ کی فوٹو کاپی، والد/سرپرست کے شناختی کارڈ کی کاپی لف کرنا ضروری ہوگی۔ جامعہ کی طرف سے وقتاً فوقتاً دی جانے والی ہدایات بھی واجب العمل ہوں گی۔\n\nمیں حلفیہ اقرار کرتا ہوں کہ مندرجہ بالا قواعد و ضوابط کی پابندی کروں گا۔\n\nادارہ سے رابطہ کیلئے نمبر: 0341-4212248 ، 0302-1747004"
+ },
+ "DOCS_NOTE": "Attested copies of the certificates of all examinations passed, a photocopy of your own national identity card (CNIC / B-Form) and a copy of your father’s / guardian’s identity card must be attached with every admission form. Instructions issued by the Jamia from time to time will also be binding.",
+ "P": "[Placeholder]",
+ "SETTINGS": {
+  "key": "main",
+  "universityNameUr": "جامعہ محمدیہ سیفیہ راوی ریان شریف",
+  "tagline": "A Great Centre of Outward & Inward Knowledge",
+  "taglineUr": "علمِ ظاہر اور علمِ باطن کا عظیم مرکز",
+  "hero": {
+   "title": "Shape Your Future With Excellence",
+   "subtitle": "Markazi Jamia Muhammadia Saifia, Ravi Rayyan Sharif — a great centre of ilm-e-zahir (outward knowledge) and ilm-e-batin (inward knowledge). Hifz, Tajweed, Dars-e-Nizami, Takhassus, Darul Ifta and spiritual reformation — on campus and online.",
+   "image": "__HERO__",
+   "primaryCta": {
+    "label": "Apply Now",
+    "link": "/admissions/apply"
+   },
+   "secondaryCta": {
+    "label": "Explore Programs",
+    "link": "/academics"
+   }
+  },
+  "admissionBanner": {
+   "enabled": true,
+   "text": "Online learning from home — Dars-e-Nizami, Quran with Tajweed and short courses for men & women. Apply now.",
+   "link": "/academics?mode=online"
+  },
+  "admissionsOpen": true,
+  "currentSession": "[Placeholder] 2026–2027",
+  "stats": [
+   {
+    "label": "Departments",
+    "value": "8"
+   },
+   {
+    "label": "Programs & Courses",
+    "value": "10"
+   },
+   {
+    "label": "Teachers",
+    "value": "14"
+   },
+   {
+    "label": "Online Courses",
+    "value": "6"
+   }
+  ],
+  "about": {
+   "intro": "Markazi Jamia Muhammadia Saifia, Ravi Rayyan Sharif (Lahore) is a great centre of both ilm-e-zahir (outward, scholarly knowledge) and ilm-e-batin (inward, spiritual knowledge). Its departments include Tahfeez and Tajweed-ul-Quran, Dars-e-Nizami with Takhassus fil Fiqh al-Hanafi, Darul Ifta Muhammadia Saifia, Nashr-o-Isha’at and Islah-e-Batin — alongside online education for men and women.",
+   "history": "[Placeholder] Add the history of the Jamia — when and by whom it was founded and its milestones.",
+   "vision": "[Placeholder] Add the Jamia’s official vision statement.",
+   "mission": "[Placeholder] Add the Jamia’s official mission statement.",
+   "image": "__ABOUT__",
+   "coreValues": [
+    {
+     "title": "Adherence to the Shariah",
+     "description": "Five daily prayers in congregation and observance of all the commandments of the Shariah.",
+     "icon": "ShieldCheck"
+    },
+    {
+     "title": "Following the Sunnah",
+     "description": "Appearance, dress and conduct in accordance with the Sunnah of the Prophet ﷺ.",
+     "icon": "Star"
+    },
+    {
+     "title": "Good Character",
+     "description": "Good manners and fair dealing with teachers, staff and fellow students — the adornment of a student.",
+     "icon": "HeartHandshake"
+    },
+    {
+     "title": "Ahl-e-Sunnat wa Jama’at",
+     "description": "Adherence to the teachings of Mujaddid Alf-e-Sani and A’la Hazrat, and striving to spread them.",
+     "icon": "BookOpen"
+    },
+    {
+     "title": "Rewarding Excellence",
+     "description": "Students who obtain 90% marks have their monthly fee waived.",
+     "icon": "Award"
+    },
+    {
+     "title": "Bazm-e-Adab",
+     "description": "Weekly, monthly and annual Bazm-e-Adab and co-curricular activities for every student.",
+     "icon": "Users"
+    }
+   ],
+   "achievements": [
+    {
+     "title": "Lives transformed",
+     "description": "Alhamdulillah! Thousands of people in Pakistan and abroad have had their lives transformed through the khanqahs and jamias established by Hazrat Mian Muhammad Saifi Hanafi.",
+     "icon": "Globe2"
+    },
+    {
+     "title": "[Placeholder] Achievement",
+     "description": "Add verified achievements in Admin > Settings > About.",
+     "icon": "Trophy"
+    }
+   ],
+   "accreditations": [
+    {
+     "title": "[Placeholder] Affiliation / examination board",
+     "description": "Add the Jamia’s official affiliation (e.g. its Wafaq/Tanzeem examination board) only after verification.",
+     "icon": "BadgeCheck"
+    }
+   ]
+  },
+  "viceChancellor": {
+   "name": "Hazrat Mian Muhammad Saifi Hanafi (Damat Barakatuhum al-Aliyah)",
+   "title": "Patron, Department of Islah-e-Batin",
+   "message": "[Placeholder] Add a message from Hazrat Mian Muhammad Saifi Hanafi (Damat Barakatuhum al-Aliyah) here, or remove this section in Admin > Settings > Leadership."
+  },
+  "chancellor": {
+   "name": "",
+   "title": "",
+   "message": ""
+  },
+  "leadership": [
+   {
+    "name": "Hazrat Mian Muhammad Saifi Hanafi (Damat Barakatuhum al-Aliyah)",
+    "designation": "Patron (Sarparast), Islah-e-Batin"
+   },
+   {
+    "name": "Shaykh al-Hadith Allama Allah Bakhsh Taunsvi Muhammadi Saifi",
+    "designation": "Shaykh al-Hadith"
+   },
+   {
+    "name": "Shaykh al-Hadith Allama Abdul Mannan Muhammadi Saifi",
+    "designation": "Shaykh al-Hadith"
+   },
+   {
+    "name": "Mufti Farooq Ahmad Muhammadi Saifi",
+    "designation": "Nazim-e-Taleemat (Director of Education)"
+   },
+   {
+    "name": "Maulana Rizwan Faraz Muhammadi Saifi",
+    "designation": "Nazim, Tahfeez-ul-Quran and Tajweed & Qirat"
+   }
+  ],
+  "whyChoose": [
+   {
+    "title": "Outward & Inward Knowledge",
+    "description": "Islamic sciences taught alongside spiritual training — a centre of both ilm-e-zahir and ilm-e-batin.",
+    "icon": "BookOpen"
+   },
+   {
+    "title": "Spiritual Guidance",
+    "description": "Islah-e-Batin under the patronage of Hazrat Mian Muhammad Saifi Hanafi (Damat Barakatuhum al-Aliyah).",
+    "icon": "HeartHandshake"
+   },
+   {
+    "title": "Learned Scholars",
+    "description": "Taught by Shuyukh al-Hadith, muftis, ulama and qurra of the Jamia.",
+    "icon": "GraduationCap"
+   },
+   {
+    "title": "Darul Ifta",
+    "description": "Shari’i guidance through Darul Ifta Muhammadia Saifia.",
+    "icon": "Landmark"
+   },
+   {
+    "title": "Learn Online from Home",
+    "description": "Online Dars-e-Nizami, Quran with Tajweed and short courses.",
+    "icon": "MonitorSmartphone"
+   },
+   {
+    "title": "For Men & Women",
+    "description": "Short courses in Shariah, Tafseer, Deen and Meeras for both men and women.",
+    "icon": "Users"
+   }
+  ],
+  "campusFacilities": [
+   {
+    "title": "Dar-ul-Iqama (Boarding)",
+    "description": "Residential facility for students who stay at the Jamia. [Placeholder] Add details.",
+    "icon": "Home",
+    "image": "__BOARDING__"
+   },
+   {
+    "title": "Library",
+    "description": "[Placeholder] Describe the Jamia library and its collection.",
+    "icon": "Library",
+    "image": "__LIBRARY__"
+   },
+   {
+    "title": "Classrooms",
+    "description": "[Placeholder] Describe the classrooms and Hifz halls.",
+    "icon": "Presentation",
+    "image": "__CLASSROOM__"
+   }
+  ],
+  "societies": [
+   {
+    "title": "Bazm-e-Adab",
+    "description": "Weekly, monthly and annual Bazm-e-Adab gatherings in which every student takes part.",
+    "icon": "PenTool"
+   },
+   {
+    "title": "Co-curricular Activities",
+    "description": "Other co-curricular activities organised by the Jamia throughout the year.",
+    "icon": "Sparkles"
+   }
+  ],
+  "admissions": {
+   "intro": "Admission is offered in Tahfeez-ul-Quran, Tajweed & Qirat, Dars-e-Nizami (up to Daura-e-Hadith), Takhassus fil Fiqh al-Hanafi and asri uloom (contemporary education), as well as online courses. Complete the online form and attach the required documents.",
+   "schedule": [
+    {
+     "step": "Admissions open",
+     "date": "[Placeholder] Date"
+    },
+    {
+     "step": "Last date to apply",
+     "date": "[Placeholder] Date"
+    },
+    {
+     "step": "Interview / test",
+     "date": "[Placeholder] Date"
+    },
+    {
+     "step": "Classes begin",
+     "date": "[Placeholder] Date"
+    }
+   ],
+   "generalRequirements": [
+    "Recent photograph",
+    "Photocopy of your own CNIC / B-Form",
+    "Photocopy of your father’s / guardian’s CNIC",
+    "Attested copies of the certificates of all examinations passed",
+    "Agreement to the Jamia’s rules & regulations"
+   ],
+   "feeNote": "The monthly fee must be deposited before the 10th of each month. Students who obtain 90% marks have their fee waived. Fee amounts are announced by the Jamia office."
+  },
+  "contact": {
+   "address": "Ravi Rayyan Sharif, Lahore",
+   "city": "Lahore",
+   "phones": [
+    "0341-4212248",
+    "0302-1747004"
+   ],
+   "emails": [],
+   "officeHours": "[Placeholder] Office hours",
+   "mapQuery": "Ravi Rayyan, Lahore"
+  },
+  "whatsappNumber": "",
+  "seo": {
+   "defaultTitle": "Jamia Muhammadia Saifia, Ravi Rayyan Sharif — University of Muhammadia Saifia (UMS)",
+   "defaultDescription": "A great centre of outward and inward knowledge: Hifz, Tajweed, Dars-e-Nizami, Takhassus fil Fiqh al-Hanafi, Darul Ifta, Islah-e-Batin and online courses for men and women."
+  },
+  "footerText": "Markazi Jamia Muhammadia Saifia, Ravi Rayyan Sharif — a great centre of outward and inward knowledge, offering Quran, Dars-e-Nizami, Takhassus, Darul Ifta and spiritual reformation, on campus and online."
+ }
+}

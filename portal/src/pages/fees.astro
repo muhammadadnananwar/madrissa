@@ -1,0 +1,52 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="Fees">
+  <div class="page-head"><div><h1>Fees</h1><p>Invoices, payments and receipts. Paid by bank transfer, JazzCash or Easypaisa? Upload the proof here.</p></div></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { api, get } from "../lib/api";
+    import { ready } from "../lib/shell";
+    import { badge, busy, clear, empty, fmtDate, fmtMoney, h, modal, param, selectEl } from "../lib/ui";
+    const root = document.getElementById("root")!;
+    ready.then(async () => {
+      const load = async () => {
+        const d = await get("finance/my-fees/", param("student") ? { student: param("student") } : {});
+        const cur = d.currency;
+        const payModal = (inv: any) => {
+          const amount = h("input", { type: "number", value: inv.balance, min: 1, step: "any" });
+          const method = selectEl(d.methods.filter((m: any) => m.value !== "cash"), "bank");
+          const ref = h("input", { placeholder: "Transaction ID / reference" });
+          const proof = h("input", { type: "file", accept: "image/*,.pdf" });
+          const go = h("button", { class: "btn primary" }, "Submit for verification");
+          const m = modal(`Pay ${inv.invoice_no}`, h("div", {}, d.bank_details ? h("div", { class: "alert", style: { whiteSpace: "pre-wrap" } }, d.bank_details) : null,
+            h("div", { class: "field" }, h("label", {}, "Amount"), amount), h("div", { class: "field" }, h("label", {}, "Paid via"), method),
+            h("div", { class: "field" }, h("label", {}, "Reference"), ref), h("div", { class: "field" }, h("label", {}, "Screenshot / receipt"), proof),
+            h("p", { class: "muted small" }, "The accounts office will verify your payment and send a receipt.")), { actions: [go] });
+          go.onclick = async () => {
+            const fd = new FormData();
+            fd.append("invoice", inv.id); fd.append("amount", amount.value); fd.append("method", method.value); fd.append("reference", ref.value);
+            if (proof.files?.[0]) fd.append("proof", proof.files[0]);
+            if (await busy(go, () => api("payments/", { method: "POST", body: fd }), "Submitted. JazakAllah khair!")) { m.close(); load(); }
+          };
+        };
+        clear(root, h("div", { class: "grid cols-3", style: { marginBottom: "1rem" } },
+          h("div", { class: "card stat warn" }, h("div", {}, h("div", { class: "val" }, fmtMoney(d.outstanding, cur)), h("div", { class: "lbl" }, "Outstanding"))),
+          h("div", { class: "card stat" }, h("div", {}, h("div", { class: "val" }, d.invoices.length), h("div", { class: "lbl" }, "Invoices"))),
+          h("div", { class: "card stat good" }, h("div", {}, h("div", { class: "val" }, fmtMoney(d.invoices.reduce((a: number, i: any) => a + Number(i.paid), 0), cur)), h("div", { class: "lbl" }, "Paid")))),
+          d.invoices.length ? h("div", { class: "stack" }, d.invoices.map((inv: any) => h("div", { class: "card" },
+            h("div", { class: "card-head" }, h("div", {}, h("h3", {}, inv.title), h("div", { class: "small muted" }, `${inv.invoice_no} · ${inv.student.name} · due ${fmtDate(inv.due_date)}`)),
+              h("div", { class: "row" }, inv.overdue ? badge("overdue") : null, badge(inv.status, inv.status_display))),
+            h("table", {}, h("tbody", {}, inv.items.map((i: any) => h("tr", {}, h("td", {}, i.description), h("td", { class: "num" }, fmtMoney(i.amount, cur)))),
+              Number(inv.discount) ? h("tr", {}, h("td", {}, "Discount / scholarship"), h("td", { class: "num" }, `− ${fmtMoney(inv.discount, cur)}`)) : null,
+              Number(inv.fine) ? h("tr", {}, h("td", {}, "Late fee"), h("td", { class: "num" }, fmtMoney(inv.fine, cur))) : null,
+              h("tr", { style: { fontWeight: 700 } }, h("td", {}, "Total"), h("td", { class: "num" }, fmtMoney(inv.total, cur))),
+              h("tr", {}, h("td", {}, "Balance"), h("td", { class: "num" }, fmtMoney(inv.balance, cur))))),
+            inv.payments.length ? h("div", { class: "small", style: { marginTop: ".5rem" } }, inv.payments.map((p: any) => h("div", {}, `${fmtDate(p.date)} · ${fmtMoney(p.amount, cur)} · ${p.method} `, badge(p.status, p.status_display), p.status === "verified" ? h("a", { href: `/print/receipt?id=${p.id}`, style: { marginLeft: ".5rem" } }, "Receipt") : null))) : null,
+            h("div", { class: "row", style: { marginTop: ".75rem" } }, h("a", { class: "btn sm", href: `/print/invoice?id=${inv.id}` }, "Print challan"),
+              ["unpaid", "partial"].includes(inv.status) ? h("button", { class: "btn sm primary", onclick: () => payModal(inv) }, "Upload payment proof") : null)))) : empty("No invoices."));
+      };
+      load();
+    });
+  </script>
+</Portal>

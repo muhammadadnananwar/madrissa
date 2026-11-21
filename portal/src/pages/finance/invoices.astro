@@ -1,0 +1,39 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Generate invoices">
+  <div class="page-head"><div><h1>Fee invoices</h1><p>Generate monthly / annual invoices from fee structures. Scholarships, transport fares and hostel charges are applied automatically.</p></div><a class="btn" href="/m/invoices">All invoices</a></div>
+  <div class="grid cols-2">
+    <div class="card" id="gen"></div>
+    <div class="card stack" id="tools"></div>
+  </div>
+  <script>
+    import { get, post } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { busy, h, selectEl, thisMonth } from "../../lib/ui";
+    ready.then(async () => {
+      const [sections, depts] = await Promise.all([get("academics/my-sections/"), get("departments/", { page_size: 100 })]);
+      const period = h("input", { type: "month", value: thisMonth() });
+      const due = h("input", { type: "date" });
+      const title = h("input", { placeholder: "Default: Fee for <Month Year>" });
+      const sec = selectEl(sections.map((s: any) => ({ value: s.id, label: s.label })), "", {}, "All sections");
+      const dep = selectEl(depts.results.map((d: any) => ({ value: d.id, label: d.name })), "", {}, "All departments");
+      const freqs = [["monthly", "Monthly"], ["annual", "Annual"], ["term", "Per term"], ["once", "One time (admission)"]].map(([v, l]) => h("label", { style: { fontWeight: 500 } }, h("input", { type: "checkbox", value: v, checked: v === "monthly" }), " ", l));
+      const go = h("button", { class: "btn primary" }, "Generate invoices");
+      go.onclick = () => busy(go, () => post("finance/generate-invoices/", { period: period.value, due_date: due.value || null, title: title.value || undefined, section: sec.value || null, department: dep.value || null,
+        frequencies: freqs.map((f) => f.querySelector("input")!).filter((i) => i.checked).map((i) => i.value) }));
+      document.getElementById("gen")!.append(h("h3", {}, "Generate"), h("div", { class: "form-grid" },
+        h("div", { class: "field" }, h("label", {}, "Billing month"), period), h("div", { class: "field" }, h("label", {}, "Due date (default 10th)"), due),
+        h("div", { class: "field full" }, h("label", {}, "Title"), title), h("div", { class: "field" }, h("label", {}, "Department"), dep), h("div", { class: "field" }, h("label", {}, "Section"), sec),
+        h("div", { class: "field full" }, h("label", {}, "Include fee heads charged"), h("div", { class: "row" }, freqs))), go,
+        h("p", { class: "muted small" }, "Students who already have an invoice with the same title for the month are skipped, so it's safe to run again."));
+      const lateAmt = h("input", { type: "number", placeholder: "Use default from settings", min: 0 });
+      const late = h("button", { class: "btn" }, "Apply late fee to overdue invoices");
+      late.onclick = () => busy(late, () => post("finance/apply-late-fees/", { amount: lateAmt.value || null }));
+      const remind = h("button", { class: "btn" }, "Send reminders to all defaulters");
+      remind.onclick = () => busy(remind, () => post("finance/defaulters/remind/"));
+      document.getElementById("tools")!.append(h("h3", {}, "Tools"), h("div", { class: "field" }, h("label", {}, "Late fee amount"), lateAmt), late, remind,
+        h("div", { class: "row" }, h("a", { class: "btn ghost", href: "/m/fee-structures" }, "Fee structures"), h("a", { class: "btn ghost", href: "/m/concessions" }, "Scholarships"), h("a", { class: "btn ghost", href: "/m/payments?status=pending" }, "Verify proofs")));
+    });
+  </script>
+</Portal>

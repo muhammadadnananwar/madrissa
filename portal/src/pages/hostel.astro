@@ -1,0 +1,46 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="Hostel">
+  <div class="page-head"><div><h1>Hostel desk</h1><p>Occupancy, night roll call and gate passes.</p></div>
+    <div class="row"><a class="btn" href="/m/hostel-allocations">Allocations</a><a class="btn" href="/m/mess-menu">Mess menu</a></div></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../lib/api";
+    import { mountCrud } from "../lib/crud";
+    import { ready } from "../lib/shell";
+    import { badge, busy, clear, h, tabs, today } from "../lib/ui";
+    const root = document.getElementById("root")!;
+    ready.then(() => {
+      const body = h("div", {});
+      const views: Record<string, () => any> = {
+        occupancy: async () => {
+          const hs = await get("hostel/occupancy/");
+          clear(body, h("div", { class: "stack" }, hs.map((x: any) => h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", {}, x.name), h("span", {}, `${x.occupied}/${x.capacity} beds`)),
+            h("div", { class: "grid auto" }, x.rooms.map((r: any) => h("div", { class: "card", style: { padding: ".75rem" } }, h("div", { class: "row between" }, h("strong", {}, `Room ${r.number}`), badge(r.occupied >= r.capacity ? "cancelled" : "active", `${r.occupied}/${r.capacity}`)),
+              h("ul", { class: "small", style: { margin: ".4rem 0 0", paddingLeft: "1rem" } }, r.students.map((s: string) => h("li", {}, s))))))))));
+        },
+        rollcall: async () => {
+          const date = h("input", { type: "date", value: today(), style: { width: "auto" } });
+          const box = h("div", {});
+          const load = async () => {
+            const d = await get("hostel/roll-call/", { date: date.value });
+            const rows = d.rows.map((r: any) => ({ ...r, is_present: r.is_present ?? !r.on_gate_pass }));
+            const save = h("button", { class: "btn primary" }, "Save roll call");
+            save.onclick = () => busy(save, () => post("hostel/roll-call/", { date: date.value, records: rows.map((r: any) => ({ student: r.student, is_present: r.is_present, remarks: r.remarks })) }));
+            clear(box, h("div", { class: "card flush" }, h("div", { class: "toolbar" }, h("span", { class: "muted" }, `${rows.length} boarders`), h("div", { style: { flex: 1 } }), save),
+              h("table", {}, h("thead", {}, h("tr", {}, ["Student", "Room / bed", "Present", "Remarks"].map((x) => h("th", {}, x)))),
+                h("tbody", {}, rows.map((r: any) => h("tr", {}, h("td", {}, r.name, r.on_gate_pass ? h("span", { class: "small" }, " ", badge("out", "on gate pass")) : null), h("td", {}, `${r.room} · ${r.bed || "-"}`),
+                  h("td", {}, h("input", { type: "checkbox", checked: r.is_present, onchange: (e: any) => (r.is_present = e.target.checked) })),
+                  h("td", {}, h("input", { class: "inline-input", value: r.remarks, oninput: (e: any) => (r.remarks = e.target.value) }))))))));
+          };
+          date.onchange = load;
+          clear(body, h("div", { style: { marginBottom: "1rem" } }, date), box);
+          load();
+        },
+        passes: () => mountCrud(body, "gate-passes", { title: false }),
+      };
+      clear(root, tabs([{ key: "occupancy", label: "Occupancy" }, { key: "rollcall", label: "Night roll call" }, { key: "passes", label: "Gate passes" }], (k) => views[k]()), body);
+    });
+  </script>
+</Portal>

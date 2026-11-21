@@ -1,0 +1,23 @@
+---
+import Print from "../../layouts/Print.astro";
+---
+<Print title="ID card">
+  <script>
+    import { get } from "../../lib/api";
+    import { requireUser } from "../../lib/guard";
+    import { clear, h, initials, param } from "../../lib/ui";
+    requireUser().then(async () => {
+      const [d, site] = await Promise.all([get(`people/profile/${param("user")}/`), get("site-settings/")]);
+      const s = site.results?.[0] || {};
+      const u = d.user, st = d.student, emp = d.employee;
+      const blood = st?.blood_group || "";
+      clear(document.getElementById("doc")!, h("div", { class: "id-card" },
+        h("div", { class: "top" }, h("img", { src: "/brand/mark.svg", alt: "" }), h("div", { class: "ar", style: { fontSize: "18px" } }, s.name_arabic || ""), h("strong", {}, s.name || "Madrasa"), h("div", { class: "small" }, st ? "STUDENT ID" : "STAFF ID")),
+        h("div", { class: "body" }, h("div", { class: "avatar lg" }, u.photo ? h("img", { src: u.photo, alt: "" }) : initials(u.full_name)),
+          h("div", {}, h("h3", { style: { margin: 0 } }, u.full_name), u.father_name ? h("div", { class: "small" }, `S/D of ${u.father_name}`) : null,
+            h("div", { class: "small" }, st ? `Adm. no: ${st.admission_no}` : `Emp. no: ${emp?.employee_no}`), h("div", { class: "small" }, st ? st.section : emp?.designation),
+            blood ? h("div", { class: "small" }, `Blood group: ${blood}`) : null, u.phone ? h("div", { class: "small" }, `☎ ${u.phone}`) : null)),
+        h("div", { class: "small muted", style: { padding: "0 1rem .8rem", textAlign: "center" } }, `${s.address || ""} ${s.phone || ""}`)));
+    });
+  </script>
+</Print>

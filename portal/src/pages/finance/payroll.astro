@@ -1,0 +1,38 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Payroll">
+  <div class="page-head"><div><h1>Payroll</h1><p>Generate monthly payslips: basic + allowances − deductions − unpaid absences/leave − advance installments.</p></div>
+    <div class="row"><a class="btn" href="/m/salary-components">Allowances & deductions</a><a class="btn" href="/m/salary-advances">Advances</a></div></div>
+  <div class="card row" id="gen" style="margin-bottom:1rem"></div>
+  <div id="list"></div>
+  <script>
+    import { get, post } from "../../lib/api";
+    import { runAction } from "../../lib/crud";
+    import { ready } from "../../lib/shell";
+    import { badge, busy, clear, fmtMoney, h, table, thisMonth } from "../../lib/ui";
+    const list = document.getElementById("list")!;
+    const month = h("input", { type: "month", value: thisMonth(), style: { width: "auto" } });
+    const deduct = h("input", { type: "checkbox", checked: true });
+    const go = h("button", { class: "btn primary" }, "Generate / refresh drafts");
+    async function load() {
+      const d = await get("payslips/", { month: `${month.value}-01`, page_size: 500 });
+      const rows = d.results;
+      const total = rows.reduce((a: number, r: any) => a + Number(r.net), 0);
+      const payAll = h("button", { class: "btn gold" }, "Approve all drafts");
+      payAll.onclick = () => busy(payAll, async () => { for (const r of rows.filter((r: any) => r.status === "draft")) await post(`payslips/${r.id}/approve/`); load(); return { detail: "Approved." }; });
+      clear(list, h("div", { class: "card flush" }, h("div", { class: "toolbar" }, h("strong", {}, `${rows.length} payslip(s) · total net ${fmtMoney(total)}`), h("div", { style: { flex: 1 } }), payAll),
+        table([{ label: "Employee", render: (r: any) => r.employee_label }, { label: "Basic", render: (r: any) => fmtMoney(r.basic), cls: "num" }, { label: "Allowances", render: (r: any) => fmtMoney(r.allowances), cls: "num" },
+          { label: "Deductions", render: (r: any) => fmtMoney(Number(r.deductions) + Number(r.absence_deduction) + Number(r.advance_deduction)), cls: "num" },
+          { label: "Days (present/working)", render: (r: any) => `${r.present_days}/${r.working_days}` }, { label: "Net", render: (r: any) => h("strong", {}, fmtMoney(r.net)), cls: "num" },
+          { label: "Status", render: (r: any) => badge(r.status, r.status_display) },
+          { label: "", render: (r: any) => h("div", { class: "row" }, h("a", { class: "btn sm", href: `/print/payslip?id=${r.id}` }, "Slip"),
+            r.status === "draft" ? h("button", { class: "btn sm", onclick: () => runAction("payslips", r, { name: "approve", label: "Approve" }, load) }, "Approve") : null,
+            r.status === "approved" ? h("button", { class: "btn sm success", onclick: () => runAction("payslips", r, { name: "mark_paid", label: "Mark paid", confirm: "Record salary as paid?" }, load) }, "Mark paid") : null) }], rows, { emptyText: "No payslips for this month — generate them above." })));
+    }
+    go.onclick = async () => { if (await busy(go, () => post("finance/payroll/generate/", { month: month.value, deduct_absence: deduct.checked }))) load(); };
+    month.onchange = load;
+    document.getElementById("gen")!.append(h("span", {}, "Month"), month, h("label", { style: { fontWeight: 500 } }, deduct, " Deduct unpaid absences"), go);
+    ready.then(load);
+  </script>
+</Portal>

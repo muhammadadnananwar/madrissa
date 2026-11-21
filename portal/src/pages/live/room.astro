@@ -1,0 +1,85 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Live class">
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../../lib/api";
+    import { openForm } from "../../lib/crud";
+    import { ready } from "../../lib/shell";
+    import { badge, busy, clear, fmtDateTime, h, modal, param, table, toastError } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    const id = param("id");
+
+    function loadJitsiApi(domain: string): Promise<any> {
+      return new Promise((resolve, reject) => {
+        if ((window as any).JitsiMeetExternalAPI) return resolve((window as any).JitsiMeetExternalAPI);
+        const s = document.createElement("script");
+        s.src = `https://${domain}/external_api.js`;
+        s.onload = () => resolve((window as any).JitsiMeetExternalAPI);
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+
+    async function report() {
+      const r = await get(`live-classes/${id}/report/`);
+      modal(`Attendance — ${r.class.title}`, h("div", {}, h("p", {}, `${r.present} of ${r.total} joined`),
+        table([{ label: "Student", render: (x: any) => x.name }, { label: "Joined", render: (x: any) => (x.joined ? badge("present") : badge("absent")) },
+          { label: "First join", render: (x: any) => fmtDateTime(x.joined_at) }, { label: "Left", render: (x: any) => fmtDateTime(x.left_at) },
+          { label: "Minutes", render: (x: any) => x.minutes ?? "—", cls: "num" }, { label: "Joins", render: (x: any) => x.joins, cls: "num" }], r.rows)), { wide: true });
+    }
+
+    ready.then(async () => {
+      let lc: any;
+      try { lc = await get(`live-classes/${id}/`); } catch (e: any) { return clear(root, h("div", { class: "alert bad" }, e.message)); }
+      const stage = h("div", {});
+      const manage = h("div", { class: "row" });
+      const head = h("div", { class: "page-head" }, h("div", {}, h("a", { href: "/live", class: "small" }, "← Live classes"), h("h1", {}, lc.title),
+        h("p", {}, `${fmtDateTime(lc.scheduled_start)} · ${lc.duration_minutes} min · ${lc.teacher_label} · ${lc.provider_display} `, badge(lc.status))), manage);
+      clear(root, head, lc.description ? h("p", {}, lc.description) : null, stage);
+
+      async function join(btn?: HTMLButtonElement) {
+        const j = await busy(btn || null, () => post(`live-classes/${id}/join/`));
+        if (!j) return;
+        if (j.embed && j.room) {
+          try {
+            const Api = await loadJitsiApi(j.jitsi_domain);
+            clear(stage, h("div", { id: "meet", style: { height: "72vh", borderRadius: "12px", overflow: "hidden", background: "#000" } }));
+            const api = new Api(j.jitsi_domain, { roomName: j.room, parentNode: document.getElementById("meet"), userInfo: { displayName: j.display_name, email: j.email },
+              configOverwrite: { prejoinPageEnabled: false, startWithAudioMuted: !j.is_host }, interfaceConfigOverwrite: { SHOW_JITSI_WATERMARK: false } });
+            api.addListener("readyToClose", () => post(`live-classes/${id}/leave/`));
+            api.addListener("videoConferenceLeft", () => post(`live-classes/${id}/leave/`));
+            return;
+          } catch { /* fall back to new tab */ }
+        }
+        window.open(j.join_url, "_blank", "noopener");
+        clear(stage, h("div", { class: "card" }, h("h2", {}, "The class opened in a new tab"),
+          h("p", {}, "Your attendance has been recorded. If the tab didn't open, use the button below."),
+          j.passcode ? h("p", {}, "Passcode: ", h("code", {}, j.passcode)) : null,
+          h("div", { class: "row" }, h("a", { class: "btn primary", href: j.join_url, target: "_blank", rel: "noopener" }, "Open meeting ↗"),
+            h("button", { class: "btn", onclick: () => post(`live-classes/${id}/leave/`).then(() => clear(stage, h("div", { class: "alert good" }, "You left the class."))) }, "I have left the class"))));
+      }
+
+      const canManage = lc.teacher === (await get("auth/me/")).id || ["super_admin", "principal", "admin", "academic_coordinator"].includes(document.body.dataset.role || "");
+      if (canManage) manage.append(
+        h("button", { class: "btn", onclick: report }, "Attendance report"),
+        h("button", { class: "btn", onclick: () => openForm("live-classes", lc, () => location.reload()) }, "Edit"),
+        lc.status !== "completed" ? h("button", { class: "btn gold", onclick: async (e: any) => {
+          const rec = prompt("Recording link (optional):") || "";
+          if (await busy(e.currentTarget, () => post(`live-classes/${id}/end/`, { recording_url: rec }))) location.reload();
+        } }, "End class") : null);
+
+      if (lc.status === "cancelled") return clear(stage, h("div", { class: "alert bad" }, "This class was cancelled."));
+      if (lc.status === "completed") return clear(stage, h("div", { class: "card" }, h("h2", {}, "This class has ended"),
+        lc.recording_url ? h("a", { class: "btn primary", href: lc.recording_url, target: "_blank" }, "Watch recording") : h("p", { class: "muted" }, "No recording was shared.")));
+      const opens = new Date(lc.scheduled_start).getTime() - 15 * 60000;
+      const btn = h("button", { class: "btn primary", style: { fontSize: "1.05rem", padding: ".8rem 1.6rem" } }, canManage ? "Start class" : "Join class");
+      btn.onclick = () => join(btn).catch(toastError);
+      clear(stage, h("div", { class: "card", style: { textAlign: "center", padding: "3rem" } },
+        h("h2", {}, canManage ? "Ready to teach?" : "Ready to join?"),
+        !canManage && Date.now() < opens ? h("p", { class: "muted" }, `The class opens at ${new Date(opens).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`) : h("p", { class: "muted" }, "Make sure your microphone and camera are allowed."),
+        btn, lc.provider_error ? h("div", { class: "alert bad", style: { marginTop: "1rem" } }, lc.provider_error) : null));
+    });
+  </script>
+</Portal>

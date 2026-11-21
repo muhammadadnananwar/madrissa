@@ -1,0 +1,64 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="My profile">
+  <div class="page-head"><div><h1>My profile</h1><p>Update your contact details and password.</p></div></div>
+  <div id="force" class="alert warn hidden">For your security, please choose a new password before continuing.</div>
+  <div class="grid cols-2">
+    <form class="card" id="pf">
+      <div class="card-head"><h2>Personal details</h2></div>
+      <div class="row" style="margin-bottom:1rem"><div id="av" class="avatar lg"></div><div><label for="photo">Photo</label><input id="photo" name="photo" type="file" accept="image/*" /></div></div>
+      <div class="form-grid">
+        <div class="field"><label>First name</label><input name="first_name" /></div>
+        <div class="field"><label>Last name</label><input name="last_name" /></div>
+        <div class="field"><label>Name (Arabic / Urdu)</label><input name="name_arabic" class="ar" /></div>
+        <div class="field"><label>Email</label><input name="email" type="email" /></div>
+        <div class="field"><label>Phone</label><input name="phone" /></div>
+        <div class="field"><label>WhatsApp</label><input name="whatsapp" /></div>
+        <div class="field"><label>City</label><input name="city" /></div>
+        <div class="field full"><label>Address</label><textarea name="address"></textarea></div>
+      </div>
+      <button class="btn primary" type="submit">Save details</button>
+    </form>
+    <form class="card" id="pw">
+      <div class="card-head"><h2>Change password</h2></div>
+      <div class="field"><label>Current password</label><input name="old_password" type="password" required autocomplete="current-password" /></div>
+      <div class="field"><label>New password</label><input name="new_password" type="password" minlength="6" required autocomplete="new-password" /></div>
+      <div class="field"><label>Repeat new password</label><input name="repeat" type="password" minlength="6" required autocomplete="new-password" /></div>
+      <button class="btn primary" type="submit">Change password</button>
+      <div id="info" class="stack" style="margin-top:1.5rem"></div>
+    </form>
+  </div>
+  <script>
+    import { api, post, updateUser } from "../lib/api";
+    import { ready } from "../lib/shell";
+    import { busy, clear, h, initials, toast } from "../lib/ui";
+    const pf = document.getElementById("pf") as HTMLFormElement;
+    const pw = document.getElementById("pw") as HTMLFormElement;
+    if (new URLSearchParams(location.search).get("force")) document.getElementById("force")!.classList.remove("hidden");
+    ready.then((u) => {
+      for (const el of Array.from(pf.elements) as HTMLInputElement[]) if (el.name && el.type !== "file") el.value = u[el.name] ?? "";
+      const av = document.getElementById("av")!;
+      clear(av, u.photo ? h("img", { src: u.photo, alt: "" }) : initials(u.full_name));
+      clear(document.getElementById("info")!, h("dl", { class: "kv" },
+        h("dt", {}, "Username"), h("dd", {}, u.username), h("dt", {}, "Role"), h("dd", {}, u.role_display),
+        u.student ? [h("dt", {}, "Admission no"), h("dd", {}, u.student.admission_no), h("dt", {}, "Section"), h("dd", {}, u.student.section || "—")] : null,
+        u.employee ? [h("dt", {}, "Employee no"), h("dd", {}, u.employee.employee_no), h("dt", {}, "Designation"), h("dd", {}, u.employee.designation)] : null));
+    });
+    pf.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(pf);
+      const photo = fd.get("photo") as File;
+      if (!photo?.size) fd.delete("photo");
+      const r = await busy(pf.querySelector("button"), () => api("auth/me/", { method: "PATCH", body: fd }), "Profile updated.");
+      if (r) updateUser(r);
+    });
+    pw.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(pw);
+      if (fd.get("new_password") !== fd.get("repeat")) return toast("Passwords do not match.", "error");
+      const r = await busy(pw.querySelector("button"), () => post("auth/change-password/", { old_password: fd.get("old_password"), new_password: fd.get("new_password") }));
+      if (r) { pw.reset(); if (new URLSearchParams(location.search).get("force")) location.href = "/"; }
+    });
+  </script>
+</Portal>

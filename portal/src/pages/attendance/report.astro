@@ -1,0 +1,44 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Attendance reports">
+  <div class="page-head"><div><h1>Attendance reports</h1><p>Percentages, students below the minimum, and the monthly register.</p></div></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { download, get } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { badge, busy, clear, h, selectEl, table, tabs, thisMonth, today } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    ready.then(async () => {
+      const sections = await get("academics/my-sections/");
+      const sec = selectEl(sections.map((s: any) => ({ value: s.id, label: s.label })), sections[0]?.id, { style: { width: "auto" } }, "All sections");
+      const from = h("input", { type: "date", value: today().slice(0, 8) + "01", style: { width: "auto" } });
+      const to = h("input", { type: "date", value: today(), style: { width: "auto" } });
+      const month = h("input", { type: "month", value: thisMonth(), style: { width: "auto" } });
+      const body = h("div", {});
+      let mode = "summary";
+      async function load() {
+        clear(body, h("div", { class: "spinner" }));
+        if (mode === "summary") {
+          const d = await get("attendance/report/", { section: sec.value, from: from.value, to: to.value });
+          clear(body, h("div", { class: "card flush" }, h("div", { class: "toolbar" }, h("span", { class: "muted" }, `Minimum required: ${d.threshold}% · ${d.rows.filter((r: any) => r.below_threshold).length} student(s) below`)),
+            table([{ label: "Student", render: (r: any) => h("a", { href: `/attendance?student=${r.student}` }, r.name) }, { label: "Adm. no", render: (r: any) => r.admission_no }, { label: "Section", render: (r: any) => r.section },
+              { label: "Present", render: (r: any) => (r.summary.present || 0) + (r.summary.late || 0), cls: "num" }, { label: "Absent", render: (r: any) => r.summary.absent || 0, cls: "num" }, { label: "Leave", render: (r: any) => r.summary.leave || 0, cls: "num" },
+              { label: "Days", render: (r: any) => r.total, cls: "num" }, { label: "%", render: (r: any) => r.percentage == null ? "—" : r.below_threshold ? badge("fail", `${r.percentage}%`) : `${r.percentage}%`, cls: "num" }], d.rows)));
+        } else {
+          if (!sec.value) return clear(body, h("div", { class: "alert" }, "Choose a section for the register."));
+          const d = await get("attendance/register/", { section: sec.value, month: month.value });
+          const days = Array.from({ length: d.days }, (_, i) => i + 1);
+          clear(body, h("div", { class: "card flush" }, h("div", { class: "toolbar" }, h("button", { class: "btn sm", onclick: () => print() }, "Print register")),
+            h("div", { class: "table-wrap" }, h("table", { style: { fontSize: "11.5px" } },
+              h("thead", {}, h("tr", {}, h("th", {}, "Student"), days.map((x) => h("th", { style: { padding: ".3rem", textAlign: "center", background: d.holidays.includes(x) ? "var(--gold-100)" : "" } }, x)), h("th", {}, "%"))),
+              h("tbody", {}, d.rows.map((r: any) => h("tr", {}, h("td", { class: "nowrap" }, r.name), r.days.map((c: string, i: number) => h("td", { style: { padding: ".3rem", textAlign: "center", color: c === "A" ? "var(--danger)" : c === "P" ? "var(--good)" : "", background: d.holidays.includes(i + 1) ? "var(--gold-100)" : "" } }, c)), h("td", {}, r.percentage ?? "—"))))))));
+        }
+      }
+      const exportBtn = h("button", { class: "btn", onclick: (e: any) => busy(e.currentTarget, () => download("student-attendance/export/", { section: sec.value, date__gte: from.value, date__lte: to.value }, "attendance.csv")) }, "Export CSV");
+      [sec, from, to, month].forEach((el) => el.addEventListener("change", load));
+      clear(root, h("div", { class: "row", style: { marginBottom: "1rem" } }, sec, h("span", { class: "range" }, from, " → ", to), month, exportBtn),
+        tabs([{ key: "summary", label: "Summary" }, { key: "register", label: "Monthly register" }], (k) => { mode = k; from.parentElement!.classList.toggle("hidden", k !== "summary"); month.classList.toggle("hidden", k === "summary"); load(); }), body);
+    });
+  </script>
+</Portal>

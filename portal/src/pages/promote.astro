@@ -1,0 +1,37 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="Promote students">
+  <div class="page-head"><div><h1>Promote students</h1><p>Move students to the next class at year end, detain, or graduate them. Every action is recorded in promotion history.</p></div><a class="btn" href="/m/promotions">History</a></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../lib/api";
+    import { ready } from "../lib/shell";
+    import { busy, clear, confirmDialog, h, selectEl } from "../lib/ui";
+    const root = document.getElementById("root")!;
+    ready.then(async () => {
+      const sections = await get("academics/my-sections/", { all: 1 });
+      const opts = sections.map((s: any) => ({ value: s.id, label: s.label }));
+      const from = selectEl(opts, opts[0]?.value, { style: { width: "auto" } });
+      const to = selectEl(opts, "", { style: { width: "auto" } }, "— target section —");
+      const result = selectEl([{ value: "promoted", label: "Promote" }, { value: "repeated", label: "Detain (repeat class)" }, { value: "graduated", label: "Graduate (Fazil / Hafiz)" }], "promoted", { style: { width: "auto" } });
+      const list = h("div", {});
+      const checked = new Set<number>();
+      async function load() {
+        const rows = await get(`people/sections/${from.value}/roster/`);
+        checked.clear(); rows.forEach((r: any) => checked.add(r.id));
+        clear(list, h("div", { class: "card flush" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, h("input", { type: "checkbox", checked: true, onchange: (e: any) => { list.querySelectorAll<HTMLInputElement>("tbody input").forEach((i) => { i.checked = e.target.checked; i.dispatchEvent(new Event("change")); }); } })), h("th", {}, "Student"), h("th", {}, "Admission no"))),
+          h("tbody", {}, rows.map((r: any) => h("tr", {}, h("td", {}, h("input", { type: "checkbox", checked: true, onchange: (e: any) => (e.target.checked ? checked.add(r.id) : checked.delete(r.id)) })), h("td", {}, r.name), h("td", {}, r.admission_no)))))));
+      }
+      const go = h("button", { class: "btn primary" }, "Apply to selected");
+      go.onclick = async () => {
+        if (result.value === "promoted" && !to.value) return alert("Choose the target section.");
+        if (!(await confirmDialog(`${result.selectedOptions[0].text} ${checked.size} student(s)?`))) return;
+        if (await busy(go, () => post("people/promote/", { student_ids: [...checked], to_section: to.value ? Number(to.value) : null, result: result.value }))) load();
+      };
+      from.onchange = load;
+      clear(root, h("div", { class: "card row", style: { marginBottom: "1rem" } }, h("span", {}, "From"), from, result, h("span", {}, "to"), to, go), list);
+      load();
+    });
+  </script>
+</Portal>

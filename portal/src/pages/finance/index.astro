@@ -1,0 +1,38 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Finance">
+  <div class="page-head"><div><h1>Finance dashboard</h1><p>Income, expenses and restricted fund balances (Zakat, Sadaqah, Waqf are tracked separately).</p></div>
+    <div class="row"><input type="date" id="from" style="width:auto" /><input type="date" id="to" style="width:auto" /></div></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get } from "../../lib/api";
+    import { barList, groupedColumns } from "../../lib/charts";
+    import { ready } from "../../lib/shell";
+    import { clear, fmtMoney, h, statCard, table, today } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    const from = document.getElementById("from") as HTMLInputElement, to = document.getElementById("to") as HTMLInputElement;
+    from.value = today().slice(0, 8) + "01"; to.value = today();
+    const label = (s: string) => s.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+    async function load() {
+      const d = await get("finance/summary/", { from: from.value, to: to.value });
+      const t = d.totals;
+      clear(root, h("div", { class: "grid auto", style: { marginBottom: "1rem" } },
+        statCard("Fees collected", fmtMoney(t.fees), "cash", { href: "/m/payments", tone: "good" }), statCard("Donations", fmtMoney(t.donations), "hand", { href: "/m/donations", tone: "good" }),
+        statCard("Other income", fmtMoney(t.other_income), "plus", { href: "/m/other-income" }), statCard("Expenses", fmtMoney(t.expenses), "wallet", { href: "/m/expenses" }),
+        statCard("Net", fmtMoney(t.net), "chart", { tone: Number(t.net) >= 0 ? "good" : "warn" }), statCard("Outstanding fees", fmtMoney(t.outstanding), "receipt", { href: "/finance/defaulters", tone: "warn" }),
+        statCard("Proofs to verify", d.pending_verifications, "upload", { href: "/m/payments?status=pending", tone: d.pending_verifications ? "warn" : "" }),
+        statCard("Expenses to approve", d.pending_expenses, "clipboard", { href: "/m/expenses?status=pending", tone: d.pending_expenses ? "warn" : "" })),
+        h("div", { class: "card", style: { marginBottom: "1rem" } }, groupedColumns("Last 12 months", d.monthly.map((m: any) => new Date(`${m.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "short" })),
+          [{ name: "Fees", values: d.monthly.map((m: any) => +m.fees) }, { name: "Donations", values: d.monthly.map((m: any) => +m.donations) }, { name: "Expenses", values: d.monthly.map((m: any) => +m.expenses) }], { format: (n) => fmtMoney(n) })),
+        h("div", { class: "grid cols-2" },
+          h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", {}, "Fund balances (all time)")), table([{ label: "Fund", render: (f: any) => f.label }, { label: "Income", render: (f: any) => fmtMoney(f.income), cls: "num" }, { label: "Spent", render: (f: any) => fmtMoney(f.spent), cls: "num" }, { label: "Balance", render: (f: any) => h("strong", {}, fmtMoney(f.balance)), cls: "num" }], d.funds)),
+          h("div", { class: "card" }, barList("Expenses by category", d.expenses_by_category.map((x: any) => ({ label: x.category__name, value: +x.total })), (n) => fmtMoney(n))),
+          h("div", { class: "card" }, barList("Donations by fund", d.donations_by_fund.map((x: any) => ({ label: label(x.fund), value: +x.total })), (n) => fmtMoney(n))),
+          h("div", { class: "card" }, barList("Fee collection by method", d.collection_by_method.map((x: any) => ({ label: label(x.method), value: +x.total })), (n) => fmtMoney(n))),
+          d.budget.length ? h("div", { class: "card" }, h("h3", {}, "Budget vs actual (this year)"), table([{ label: "Category", render: (b: any) => b.category }, { label: "Budget", render: (b: any) => fmtMoney(b.budget), cls: "num" }, { label: "Spent", render: (b: any) => fmtMoney(b.spent), cls: "num" }, { label: "Remaining", render: (b: any) => fmtMoney(b.remaining), cls: "num" }], d.budget)) : null));
+    }
+    from.onchange = load; to.onchange = load;
+    ready.then(load);
+  </script>
+</Portal>

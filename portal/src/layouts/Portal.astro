@@ -1,0 +1,55 @@
+---
+import "../styles/portal.css";
+interface Props { title: string }
+const { title } = Astro.props;
+const websiteUrl = import.meta.env.PUBLIC_WEBSITE_URL || "http://localhost:4321";
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>{title} · Madrasa Portal</title>
+    <link rel="icon" href="/favicon-48.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#25104a" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="/" style="text-decoration:none">
+          <img class="brand-mark" src="/brand/mark.svg" alt="" width="42" height="50" />
+          <div><div class="brand-name">University of Muhammadia Saifia</div><div class="brand-sub">Management Portal</div></div>
+        </a>
+        <nav id="nav"></nav>
+        <div style="padding:1rem .6rem 0;font-size:12px"><a href={websiteUrl} style="color:#a593cc">↗ Public website</a></div>
+      </aside>
+      <div class="main">
+        <header class="topbar">
+          <button id="menu-toggle" class="icon-btn menu-toggle" aria-label="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+          <div class="search">
+            <input id="global-search" type="search" placeholder="Search students, staff, admission no, CNIC…" autocomplete="off" />
+            <div id="search-results" class="search-results hidden"></div>
+          </div>
+          <div style="flex:1"></div>
+          <a href="/notifications" class="icon-btn" aria-label="Notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg>
+            <span id="notif-dot" class="dot hidden"></span>
+          </a>
+          <div id="user-chip" class="user-chip"></div>
+        </header>
+        <main class="content" id="content">
+          <slot />
+        </main>
+      </div>
+    </div>
+    <script>
+      import "../lib/shell";
+    </script>
+  </body>
+</html>

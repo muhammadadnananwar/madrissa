@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body { @apply font-sans text-ink bg-surface; }
+  h1, h2, h3, h4 { @apply font-display text-primary-900 tracking-tight; }
+  html[lang='ur'] body { @apply font-urdu; line-height: 2.1; }
+  html[lang='ur'] h1, html[lang='ur'] h2, html[lang='ur'] h3, html[lang='ur'] h4 { @apply font-urdu; line-height: 1.9; }
+  ::selection { @apply bg-gold-300 text-primary-900; }
+  :focus-visible { @apply outline-none ring-2 ring-gold-400 ring-offset-2; }
+}
+
+@layer components {
+  .container-x { @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8; }
+  .section { @apply py-16 sm:py-20 lg:py-24; }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold
+      transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 whitespace-nowrap;
+  }
+  .btn-primary { @apply btn bg-primary-700 text-white hover:bg-primary-800 shadow-soft hover:shadow-lift; }
+  .btn-gold { @apply btn bg-gold-400 text-primary-900 hover:bg-gold-300 shadow-gold; }
+  .btn-outline { @apply btn border border-primary-200 bg-white text-primary-700 hover:border-primary-700 hover:bg-primary-50; }
+  .btn-ghost-light { @apply btn border border-white/40 text-white hover:bg-white/10; }
+  .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
+  .btn-sm { @apply px-3.5 py-1.5 text-xs; }
+  .btn-icon { @apply inline-flex h-9 w-9 items-center justify-center rounded-full text-primary-700 hover:bg-primary-50 transition; }
+
+  .label { @apply mb-1.5 block text-sm font-medium text-primary-900; }
+  .input {
+    @apply block w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-ink shadow-sm
+      placeholder:text-slate-400 transition focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-100
+      disabled:bg-slate-50 disabled:text-slate-500;
+  }
+  .input-error { @apply border-red-400 focus:border-red-500 focus:ring-red-100; }
+  .field-error { @apply mt-1 text-xs text-red-600; }
+
+  .card { @apply rounded-2xl border border-slate-100 bg-white shadow-soft; }
+  .card-hover { @apply transition duration-300 hover:-translate-y-1 hover:shadow-lift; }
+
+  .eyebrow { @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-gold-600; }
+  .eyebrow::before { content: ''; @apply h-px w-8 bg-gold-400; }
+  .section-title { @apply mt-3 text-3xl font-bold sm:text-4xl lg:text-5xl; }
+  .prose-ums p { @apply mb-4 leading-relaxed text-slate-700; }
+  .prose-ums h2 { @apply mb-3 mt-8 text-2xl font-bold; }
+  .prose-ums ul { @apply mb-4 list-disc space-y-1 ps-6 text-slate-700; }
+
+  /* Urdu text block (Nastaliq needs extra line height) */
+  .urdu { @apply font-urdu; line-height: 2.1; }
+  .badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium; }
+  .table-th { @apply px-4 py-3 text-start text-xs font-semibold uppercase tracking-wider text-slate-500; }
+  .table-td { @apply px-4 py-3 text-sm text-slate-700 align-middle; }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { @apply rounded-full bg-primary-200; }
+  .gold-rule { background: linear-gradient(90deg, transparent, #E9BE3B, transparent); height: 1px; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+}

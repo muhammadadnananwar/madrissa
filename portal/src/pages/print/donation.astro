@@ -1,0 +1,20 @@
+---
+import Print from "../../layouts/Print.astro";
+---
+<Print title="Donation receipt">
+  <script>
+    import { get } from "../../lib/api";
+    import { requireUser } from "../../lib/guard";
+    import { clear, fmtDate, fmtMoney, h, param } from "../../lib/ui";
+    requireUser().then(async () => {
+      const d = await get(`finance/donations/${param("id")}/receipt/`);
+      clear(document.getElementById("doc")!, h("div", { class: "print-page" },
+        h("div", { class: "print-head" }, h("div", {}, h("h2", { style: { margin: 0 } }, d.institution.name), h("div", { class: "small muted" }, d.institution.address)), h("div", { class: "right" }, h("strong", {}, "DONATION RECEIPT"), h("div", {}, d.receipt_no))),
+        h("p", { class: "ar", style: { textAlign: "center", fontSize: "20px" } }, "جزاكم الله خيراً"),
+        h("dl", { class: "kv" }, h("dt", {}, "Donor"), h("dd", {}, d.donor || "Anonymous"), h("dt", {}, "Fund"), h("dd", {}, d.fund), h("dt", {}, "Amount"), h("dd", {}, h("strong", { style: { fontSize: "1.3rem" } }, fmtMoney(d.amount, d.institution.currency))),
+          h("dt", {}, "Date"), h("dd", {}, fmtDate(d.date)), h("dt", {}, "Method"), h("dd", {}, `${d.method}${d.reference ? " · " + d.reference : ""}`), h("dt", {}, "Notes"), h("dd", {}, d.notes || "—")),
+        h("p", { class: "small muted", style: { marginTop: "1.5rem" } }, "Zakat and Sadaqah are kept in separate funds and spent only on eligible heads."),
+        h("div", { class: "right", style: { marginTop: "2rem" } }, `______________ ${d.received_by || "Accounts"}`)));
+    });
+  </script>
+</Print>

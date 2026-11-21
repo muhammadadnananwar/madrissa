@@ -1,0 +1,40 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="Library">
+  <div class="page-head"><div><h1>Library</h1><p>Catalogue, issue & return desk, overdue books and fines.</p></div></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../lib/api";
+    import { mountCrud } from "../lib/crud";
+    import { LIBRARY, hasRole } from "../lib/roles";
+    import { ready } from "../lib/shell";
+    import { badge, busy, clear, fmtDate, h, table, tabs } from "../lib/ui";
+    const root = document.getElementById("root")!;
+    ready.then(async (u) => {
+      const body = h("div", {});
+      const staff = hasRole(u, LIBRARY);
+      const views: Record<string, () => any> = {
+        catalogue: () => mountCrud(body, "books", { title: false }),
+        mine: async () => {
+          const d = await get("book-issues/", { page_size: 100 });
+          clear(body, h("div", { class: "card flush" }, table([{ label: "Book", render: (r: any) => r.book_label }, u.role === "parent" ? { label: "Borrower", render: (r: any) => r.borrower_label } : null,
+            { label: "Issued", render: (r: any) => fmtDate(r.issued_on) }, { label: "Due", render: (r: any) => fmtDate(r.due_date) }, { label: "Status", render: (r: any) => (r.is_overdue ? badge("overdue") : badge(r.status, r.status_display)) },
+            { label: "Fine", render: (r: any) => (Number(r.fine) ? `${r.fine}${r.fine_paid ? " (paid)" : ""}` : "—") }].filter(Boolean) as any, d.results, { emptyText: "No books borrowed." })));
+        },
+        issued: () => mountCrud(body, "book-issues", { title: false, filters: { status: "issued" } }),
+        overdue: async () => {
+          const rows = await get("library/overdue/");
+          const remind = h("button", { class: "btn" }, "Send reminders");
+          remind.onclick = () => busy(remind, () => post("library/overdue/"));
+          clear(body, h("div", { class: "card flush" }, h("div", { class: "toolbar" }, h("strong", {}, `${rows.length} overdue`), h("div", { style: { flex: 1 } }), remind),
+            table([{ label: "Book", render: (r: any) => r.book }, { label: "Borrower", render: (r: any) => r.borrower }, { label: "Phone", render: (r: any) => r.phone || "—" }, { label: "Due", render: (r: any) => fmtDate(r.due_date) }, { label: "Days late", render: (r: any) => r.days_late, cls: "num" }], rows, { emptyText: "No overdue books." })));
+        },
+        reservations: () => mountCrud(body, "book-reservations", { title: false }),
+      };
+      const list = staff ? [{ key: "catalogue", label: "Catalogue & issue" }, { key: "issued", label: "Issued books" }, { key: "overdue", label: "Overdue" }, { key: "reservations", label: "Reservations" }]
+        : [{ key: "mine", label: "My books" }, { key: "catalogue", label: "Catalogue" }, { key: "reservations", label: "My reservations" }];
+      clear(root, staff ? h("p", { class: "muted" }, "Tip: open a book in the catalogue and use “Issue book”; open an issued book to return, renew or record the fine.") : null, tabs(list, (k) => views[k]()), body);
+    });
+  </script>
+</Portal>

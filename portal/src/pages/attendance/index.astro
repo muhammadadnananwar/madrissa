@@ -1,0 +1,91 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Attendance">
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { badge, busy, clear, empty, fmtDate, h, param, selectEl, table, today } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    const STATUSES = [["present", "P"], ["absent", "A"], ["late", "L"], ["leave", "Lv"], ["half_day", "H"], ["excused", "E"]];
+
+    async function myAttendance(user: any) {
+      const kids = user.role === "parent" ? user.children || [] : [];
+      const sel = kids.length > 1 ? selectEl(kids.map((k: any) => ({ value: k.id, label: k.name })), param("student") || kids[0].id) : null;
+      const body = h("div", {});
+      async function load() {
+        const sid = sel?.value || param("student") || (kids[0]?.id ?? "");
+        const d = await get("attendance/mine/", sid ? { student: sid } : {});
+        clear(body,
+          h("div", { class: "grid cols-4", style: { marginBottom: "1rem" } },
+            h("div", { class: "card stat good" }, h("div", {}, h("div", { class: "val" }, d.percentage == null ? "—" : `${d.percentage}%`), h("div", { class: "lbl" }, "Attendance"))),
+            ...["present", "absent", "late", "leave"].map((s) => h("div", { class: "card stat" }, h("div", {}, h("div", { class: "val" }, d.summary[s] || 0), h("div", { class: "lbl" }, s[0].toUpperCase() + s.slice(1)))))),
+          h("div", { class: "card flush" }, table([
+            { label: "Date", render: (r: any) => fmtDate(r.date) },
+            { label: "Day", render: (r: any) => new Date(`${r.date}T00:00:00`).toLocaleDateString(undefined, { weekday: "long" }) },
+            { label: "Status", render: (r: any) => badge(r.status, r.status_display) },
+            { label: "Remarks", render: (r: any) => r.remarks || "" }], d.records, { emptyText: "No attendance recorded yet." })));
+      }
+      sel?.addEventListener("change", load);
+      clear(root, h("div", { class: "page-head" }, h("div", {}, h("h1", {}, "Attendance"), h("p", {}, "Daily attendance record")),
+        h("div", { class: "row" }, sel, h("a", { class: "btn", href: "/leaves" }, "Apply for leave"))), body);
+      load();
+    }
+
+    async function marking() {
+      const sections = await get("academics/my-sections/");
+      if (!sections.length) return clear(root, empty("You are not assigned to any section yet."));
+      const secSel = selectEl(sections.map((s: any) => ({ value: s.id, label: `${s.label} (${s.student_count})` })), param("section") || sections[0].id);
+      const dateIn = h("input", { type: "date", value: param("date") || today(), max: today(), style: { width: "auto" } });
+      const subSel = h("select", { style: { width: "auto" } });
+      const sheet = h("div", {});
+      const state = new Map<number, { status: string; remarks: string }>();
+
+      async function loadSubjects() {
+        const subs = await get(`academics/sections/${secSel.value}/subjects/`);
+        clear(subSel, h("option", { value: "" }, "Daily attendance"), subs.map((s: any) => h("option", { value: s.id }, `Period: ${s.label}`)));
+      }
+      async function load() {
+        clear(sheet, h("div", { class: "spinner" }));
+        const d = await get("attendance/sheet/", { section: secSel.value, date: dateIn.value, subject: subSel.value });
+        state.clear();
+        for (const s of d.students) state.set(s.student, { status: s.status || "", remarks: s.remarks || "" });
+        const counts = () => { const c: Record<string, number> = {}; for (const v of state.values()) if (v.status) c[v.status] = (c[v.status] || 0) + 1; return c; };
+        const summary = h("div", { class: "row small" });
+        const drawSummary = () => { const c = counts(); clear(summary, STATUSES.map(([k]) => h("span", {}, badge(k), " ", c[k] || 0)), h("span", { class: "muted" }, `· ${[...state.values()].filter((v) => !v.status).length} unmarked`)); };
+        const rows = d.students.map((s: any) => {
+          const pills = h("div", { class: "att-pills", role: "radiogroup", "aria-label": s.name },
+            STATUSES.map(([k, l]) => h("button", { type: "button", dataset: { s: k }, class: state.get(s.student)!.status === k ? "on" : "", title: k.replace("_", " "),
+              onclick: (e: any) => { state.get(s.student)!.status = k; pills.querySelectorAll("button").forEach((b: any) => b.classList.toggle("on", b === e.currentTarget)); drawSummary(); } }, l)));
+          const rem = h("input", { class: "inline-input", placeholder: "Remarks", value: state.get(s.student)!.remarks, oninput: (e: any) => (state.get(s.student)!.remarks = e.target.value) });
+          return h("tr", {}, h("td", {}, s.roll_no || ""), h("td", {}, h("strong", {}, s.name), h("div", { class: "small muted" }, s.admission_no, s.on_leave ? " · on approved leave" : "")), h("td", {}, pills), h("td", {}, rem));
+        });
+        const setAll = (st: string) => { for (const v of state.values()) if (!v.status || st === "present") v.status = v.status === "leave" ? "leave" : st; load2(); };
+        const load2 = () => { tbody.querySelectorAll("tr").forEach((tr, i) => { const sid = d.students[i].student; tr.querySelectorAll(".att-pills button").forEach((b: any) => b.classList.toggle("on", b.dataset.s === state.get(sid)!.status)); }); drawSummary(); };
+        const tbody = h("tbody", {}, rows);
+        const save = h("button", { class: "btn primary" }, "Save attendance");
+        save.onclick = async () => {
+          const records = [...state.entries()].filter(([, v]) => v.status).map(([student, v]) => ({ student, ...v }));
+          await busy(save, () => post("attendance/bulk/", { section: Number(secSel.value), date: dateIn.value, subject: subSel.value ? Number(subSel.value) : null, records }));
+        };
+        clear(sheet,
+          d.is_holiday ? h("div", { class: "alert warn" }, "This date is a holiday / weekly off.") : null,
+          d.already_marked ? h("div", { class: "alert" }, "Attendance already marked — changes will update it.") : null,
+          h("div", { class: "card flush" },
+            h("div", { class: "toolbar" }, h("button", { class: "btn sm success", onclick: () => setAll("present") }, "Mark all present"), summary, h("div", { style: { flex: 1 } }), save),
+            d.students.length ? h("div", { class: "table-wrap" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Roll"), h("th", {}, "Student"), h("th", {}, "Status"), h("th", {}, "Remarks"))), tbody)) : empty("No active students in this section.")));
+        drawSummary();
+      }
+      secSel.onchange = async () => { await loadSubjects(); load(); };
+      dateIn.onchange = load;
+      subSel.onchange = load;
+      clear(root, h("div", { class: "page-head" }, h("div", {}, h("h1", {}, "Mark attendance"), h("p", {}, "P = present, A = absent, L = late, Lv = leave, H = half day, E = excused. Guardians are notified of absences automatically.")),
+        h("div", { class: "row" }, secSel, subSel, dateIn, h("a", { class: "btn", href: `/attendance/report` }, "Reports & register"))), sheet);
+      await loadSubjects();
+      load();
+    }
+
+    ready.then((u) => (["student", "parent"].includes(u.role) ? myAttendance(u) : marking()));
+  </script>
+</Portal>

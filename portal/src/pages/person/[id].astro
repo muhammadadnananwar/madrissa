@@ -1,0 +1,61 @@
+---
+import Portal from "../../layouts/Portal.astro";
+const { id } = Astro.params;
+---
+<Portal title="Record">
+  <div id="p" data-id={id}><div class="spinner"></div></div>
+  <script>
+    import { get } from "../../lib/api";
+    import { ready } from "../../lib/shell";
+    import { badge, clear, fmtDate, fmtMoney, h, initials, table, tabs, toastError } from "../../lib/ui";
+    const root = document.getElementById("p")!;
+    const kv = (o: Record<string, any>) => h("dl", { class: "kv" }, Object.entries(o).filter(([, v]) => v !== undefined).flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v === null || v === "" ? "—" : typeof v === "boolean" ? (v ? "Yes" : "No") : v)]));
+    const simple = (rows: any[], cols: [string, string, ((v: any) => any)?][]) => table(cols.map(([label, key, fn]) => ({ label, render: (r: any) => (fn ? fn(r[key]) : r[key] ?? "—") })), rows || []);
+    ready.then(async () => {
+      let d: any;
+      try { d = await get(`people/profile/${root.dataset.id}/`); } catch (e) { toastError(e); clear(root, h("div", { class: "alert bad" }, (e as any).message)); return; }
+      const u = d.user, st = d.student, emp = d.employee;
+      const sections: { key: string; label: string; render: () => any }[] = [
+        { key: "profile", label: "Profile", render: () => h("div", { class: "grid cols-2" },
+          h("div", { class: "card" }, h("h3", {}, "Personal"), kv({ "Full name": u.full_name, "Name (Arabic)": u.name_arabic, "Father's name": u.father_name, Gender: u.gender, "Date of birth": fmtDate(u.date_of_birth), "CNIC / B-Form": u.cnic, Phone: u.phone, WhatsApp: u.whatsapp, Email: u.email, Address: u.address, City: u.city })),
+          st ? h("div", { class: "card" }, h("h3", {}, "Student"), kv({ "Admission no": st.admission_no, "Roll no": st.roll_no, Status: st.status, Section: st.section, Department: st.department, "Admitted on": fmtDate(st.admission_date), Boarder: st.is_boarder, Orphan: st.is_orphan, "Blood group": st.blood_group, "Mother's name": st.mother_name, "Previous institution": st.previous_institution, Guardian: st.guardian ? `${st.guardian.name} (${st.guardian.relation}) · ${st.guardian.phone}` : null, "Medical notes": st.medical_notes })) : null,
+          emp ? h("div", { class: "card" }, h("h3", {}, "Employment"), kv({ "Employee no": emp.employee_no, Designation: emp.designation, Type: emp.kind, Department: emp.department, Status: emp.status, Employment: emp.employment_type, "Joined on": fmtDate(emp.joining_date), Qualification: emp.qualification, Specialization: emp.specialization, "Ijazah / Sanad": emp.ijazah, Experience: `${emp.experience_years} years`, "Basic salary": emp.basic_salary !== undefined ? fmtMoney(emp.basic_salary) : undefined, Teaching: (d.teaching || []).join("; ") })) : null) },
+        { key: "attendance", label: "Attendance", render: () => h("div", { class: "card" },
+          d.attendance?.percentage != null ? h("h2", {}, `${d.attendance.percentage}% attendance`) : null,
+          h("div", { class: "row" }, Object.entries(d.attendance?.summary || {}).map(([k, v]) => h("span", {}, badge(k), " ", v))),
+          st ? h("p", {}, h("a", { href: `/attendance?student=${st.id}` }, "View day-by-day attendance →")) : null) },
+        { key: "leaves", label: "Leaves", render: () => h("div", { class: "card" }, simple(d.leaves, [["Type", "leave_type"], ["From", "start_date", fmtDate], ["To", "end_date", fmtDate], ["Status", "status", badge], ["Reason", "reason"]])) },
+      ];
+      if (st) sections.push(
+        { key: "fees", label: "Fees", render: () => h("div", { class: "card" }, h("div", { class: "grid cols-3", style: { marginBottom: "1rem" } }, h("div", {}, h("div", { class: "muted" }, "Billed"), h("h2", {}, fmtMoney(d.fees.total))), h("div", {}, h("div", { class: "muted" }, "Paid"), h("h2", {}, fmtMoney(d.fees.paid))), h("div", {}, h("div", { class: "muted" }, "Balance"), h("h2", {}, fmtMoney(d.fees.balance)))),
+          simple(d.fees.invoices, [["Invoice", "invoice_no"], ["Title", "title"], ["Due", "due_date", fmtDate], ["Total", "total", fmtMoney], ["Paid", "paid_amount", fmtMoney], ["Status", "status", badge]])) },
+        { key: "results", label: "Results", render: () => h("div", { class: "card" }, h("p", {}, h("a", { class: "btn sm", href: `/exams/report-card?student=${st.id}` }, "Open report card")), simple(d.marks, [["Exam", "paper_exam_name"], ["Subject", "paper_subject_name"], ["Marks", "marks_obtained"], ["Max", "paper_max_marks"], ["Absent", "is_absent", (v) => (v ? "Yes" : "")]])) },
+        { key: "hifz", label: "Quran programs", render: () => h("div", { class: "card" }, h("h2", {}, `${d.hifz.memorized} / 30 paras memorised`),
+          d.quran ? h("dl", { class: "kv", style: { margin: "1rem 0" } }, h("dt", {}, "Noorani Qaida"), h("dd", {}, `${d.quran.qaida.passed}/${d.quran.qaida.total} lessons${d.quran.qaida.current ? ` (on takhti ${d.quran.qaida.current})` : ""}`),
+            h("dt", {}, "Nazra"), h("dd", {}, `${d.quran.nazra}/30 paras · ${d.quran.nazra_khatms} khatm(s)`), h("dt", {}, "Tarjuma"), h("dd", {}, `${d.quran.tarjuma_percentage}% of the Qur'an`),
+            h("dt", {}, "Duas, Kalimas, Tajweed…"), h("dd", {}, `${d.quran.checklist_done}/${d.quran.checklist_total} learned`)) : null,
+          h("p", {}, h("a", { href: `/hifz?student=${st.id}` }, "Open full Quran progress →")), simple(d.hifz.juz, [["Para", "juz"], ["Status", "status", badge], ["Completed", "completed_on", fmtDate], ["Test score", "test_score"]])) },
+        { key: "hostel", label: "Hostel & transport", render: () => h("div", { class: "grid cols-2" }, h("div", { class: "card" }, h("h3", {}, "Hostel"), simple(d.hostel, [["Room", "room"], ["Bed", "bed_no"], ["From", "from_date", fmtDate], ["To", "to_date", fmtDate], ["Active", "is_active", (v) => (v ? "✓" : "")]])), h("div", { class: "card" }, h("h3", {}, "Transport"), simple(d.transport, [["Route", "route"], ["Stop", "stop"]]))) },
+        { key: "promotions", label: "Promotions", render: () => h("div", { class: "card" }, simple(d.promotions, [["Date", "date", fmtDate], ["From", "from_section"], ["To", "to_section"], ["Result", "result", badge]])) },
+      );
+      if (emp) sections.push(
+        { key: "payslips", label: "Payslips", render: () => h("div", { class: "card" }, d.payslips ? simple(d.payslips, [["Month", "month", (v) => new Date(v).toLocaleDateString(undefined, { month: "long", year: "numeric" })], ["Net", "net", fmtMoney], ["Status", "status", badge], ["Paid on", "paid_on", fmtDate]]) : h("p", { class: "muted" }, "Restricted.")) },
+        { key: "history", label: "Employment history", render: () => h("div", { class: "card" }, simple(d.history, [["Organization", "organization"], ["Position", "position"], ["From", "from_date", fmtDate], ["To", "to_date", fmtDate]])) },
+      );
+      sections.push(
+        { key: "qualifications", label: "Qualifications & documents", render: () => h("div", { class: "grid cols-2" }, h("div", { class: "card" }, h("h3", {}, "Qualifications"), simple(d.qualifications, [["Title", "title"], ["Institution", "institution"], ["Year", "year"], ["Grade", "grade"]])), h("div", { class: "card" }, h("h3", {}, "Documents"), table([{ label: "Title", render: (r: any) => r.url ? h("a", { href: r.url, target: "_blank" }, r.title) : r.title }, { label: "Kind", render: (r: any) => r.kind }], d.documents))) },
+        { key: "conduct", label: "Conduct & health", render: () => h("div", { class: "grid cols-2" }, h("div", { class: "card" }, h("h3", {}, "Disciplinary"), simple(d.disciplinary, [["Date", "date", fmtDate], ["Severity", "severity", badge], ["Incident", "incident"], ["Action", "action_taken"]])), h("div", { class: "card" }, h("h3", {}, "Medical"), simple(d.medical, [["Date", "date", fmtDate], ["Condition", "condition"], ["Treatment", "treatment"]])), h("div", { class: "card" }, h("h3", {}, "Achievements"), simple(d.achievements, [["Date", "date", fmtDate], ["Title", "title"], ["Category", "category"]]))) },
+        { key: "certs", label: "Certificates & library", render: () => h("div", { class: "grid cols-2" }, h("div", { class: "card" }, h("h3", {}, "Certificates / Asnaad"), table([{ label: "Serial", render: (r: any) => h("a", { href: `/print/certificate?id=${r.id}` }, r.serial_no) }, { label: "Title", render: (r: any) => r.title }, { label: "Issued", render: (r: any) => fmtDate(r.issue_date) }], d.certificates)), h("div", { class: "card" }, h("h3", {}, "Library"), simple(d.library, [["Book", "book"], ["Issued", "issued_on", fmtDate], ["Due", "due_date", fmtDate], ["Status", "status", badge], ["Fine", "fine"]]))) },
+      );
+      const body = h("div", {});
+      clear(root,
+        h("div", { class: "card row", style: { marginBottom: "1rem", gap: "1.25rem" } },
+          h("div", { class: "avatar lg" }, u.photo ? h("img", { src: u.photo, alt: "" }) : initials(u.full_name)),
+          h("div", { style: { flex: 1 } }, h("h1", {}, u.full_name), u.name_arabic ? h("div", { class: "ar" }, u.name_arabic) : null,
+            h("div", { class: "muted" }, [u.role_display, st?.admission_no, st?.section, emp?.designation].filter(Boolean).join(" · "))),
+          h("div", { class: "row no-print" }, h("a", { class: "btn", href: `/print/id-card?user=${u.id}` }, "ID card"), h("button", { class: "btn", onclick: () => print() }, "Print"))),
+        tabs(sections.map((x) => ({ key: x.key, label: x.label })), (k) => clear(body, sections.find((x) => x.key === k)!.render())),
+        body);
+    });
+  </script>
+</Portal>

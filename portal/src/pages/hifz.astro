@@ -1,0 +1,252 @@
+---
+import Portal from "../layouts/Portal.astro";
+---
+<Portal title="Quran programs">
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { get, post } from "../lib/api";
+    import { lineChart } from "../lib/charts";
+    import { ready } from "../lib/shell";
+    import { badge, busy, clear, empty, fmtDate, h, modal, param, selectEl, statCard, table, tabs, today } from "../lib/ui";
+    const root = document.getElementById("root")!;
+
+    const PARA_STATUS = [["not_started", "Not started"], ["in_progress", "In progress"], ["memorized", "Completed"], ["tested", "Tested & approved"]];
+    const QAIDA_STATUS = [["not_started", "Not started"], ["in_progress", "In progress"], ["repeat", "Needs repetition"], ["passed", "Passed"]];
+    const TARJUMA_STATUS = [["not_started", "Not started"], ["in_progress", "In progress"], ["completed", "Completed"], ["tested", "Tested & approved"]];
+    const CHECK_STATUS = [["not_started", "Not started"], ["learning", "Learning"], ["learned", "Learned"], ["tested", "Tested"]];
+    const PROGRAMS = [["hifz", "Hifz"], ["murajaah", "Murajaah (revision)"], ["nazra", "Nazra"], ["qaida", "Noorani Qaida"], ["tarjuma", "Tarjuma-tul-Quran"], ["tajweed", "Tajweed"]];
+    const opts = (rows: string[][]) => rows.map(([value, label]) => ({ value, label }));
+    const pct = (v: number) => h("div", { style: { minWidth: "120px" } }, h("div", { class: "progress" }, h("span", { style: { width: `${Math.min(100, v)}%` } })), h("div", { class: "small muted" }, `${v}%`));
+
+    /** Small modal with a status select (+ optional extra inputs) that POSTs to the student endpoint. */
+    function editModal(title: string, statuses: string[][], current: string, extras: { name: string; label: string; type?: string; value?: any; max?: number }[], save: (body: any) => Promise<any>) {
+      const st = selectEl(opts(statuses), current);
+      const inputs = extras.map((e) => ({ e, el: h("input", { type: e.type || "number", min: 0, max: e.max, value: e.value ?? "" }) }));
+      const go = h("button", { class: "btn primary" }, "Save");
+      const m = modal(title, h("div", {}, h("div", { class: "field" }, h("label", {}, "Status"), st), inputs.map(({ e, el }) => h("div", { class: "field" }, h("label", {}, e.label), el))), { actions: [go] });
+      go.onclick = async () => {
+        const body: any = { status: st.value };
+        for (const { e, el } of inputs) body[e.name] = e.type === "text" ? el.value : el.value === "" ? null : Number(el.value);
+        if (await busy(go, () => save(body))) m.close();
+      };
+    }
+
+    function paraGrid(data: any, studentId: number, program: string, canEdit: boolean, reload: () => void) {
+      const label = program === "hifz" ? "memorised" : program === "nazra" ? "read" : "translated";
+      return h("div", { class: "card" },
+        h("div", { class: "card-head" }, h("h3", {}, `${data.done}/30 paras ${label} · ${data.tested} tested`), canEdit ? h("span", { class: "small muted" }, "Click a para to update") : null),
+        h("div", { class: "legend" }, h("span", {}, h("i", { style: { background: "var(--surface)", border: "1px solid var(--border)" } }), "Not started"),
+          h("span", {}, h("i", { style: { background: "var(--gold-100)" } }), "In progress"), h("span", {}, h("i", { style: { background: "var(--brand-100)" } }), "Completed"),
+          h("span", {}, h("i", { style: { background: "var(--brand-600)" } }), "Tested")),
+        h("div", { class: "juz-grid" }, data.grid.map((g: any) => h("div", {
+          class: `juz ${g.status} ${canEdit ? "clickable" : ""}`, title: `Para ${g.juz}: ${g.status.replace("_", " ")}${g.test_score ? ` (score ${g.test_score})` : ""}`,
+          onclick: canEdit ? () => editModal(`Para ${g.juz}`, PARA_STATUS, g.status, [{ name: "test_score", label: "Test score (/100)", value: g.test_score, max: 100 }],
+            async (b) => { const r = await post(`hifz/students/${studentId}/juz/`, { program, juz: g.juz, ...b }); reload(); return r; }) : null,
+        }, g.juz))),
+        program === "nazra" ? h("p", { class: "small muted", style: { marginTop: ".75rem" } }, "When all 30 paras are read, a khatm is recorded, the certificate is issued and the grid resets for the next khatm.") : null);
+    }
+
+    async function studentPrograms(container: HTMLElement, studentId: number, initialTab?: string) {
+      clear(container, h("div", { class: "spinner" }));
+      let d: any;
+      try { d = await get(`hifz/students/${studentId}/programs/`); }
+      catch (e: any) { return clear(container, h("div", { class: "alert bad" }, e.status === 403 ? "You can only view students of your own halqa." : e.message)); }
+      const can = d.can_edit;
+      const reload = () => studentPrograms(container, studentId, current);
+      let current = initialTab || "overview";
+      const body = h("div", {});
+      const q = d.qaida, t = d.tarjuma;
+      const checkDone = d.checklists.reduce((a: number, g: any) => a + g.done, 0), checkTotal = d.checklists.reduce((a: number, g: any) => a + g.items.length, 0);
+
+      const views: Record<string, () => any> = {
+        overview: () => h("div", { class: "stack" },
+          h("div", { class: "grid auto" },
+            statCard("Noorani Qaida", q.completed ? "Completed" : `${q.passed}/${q.total} lessons`, "book", { tone: q.completed ? "good" : "" }),
+            statCard("Nazra (current reading)", `${d.nazra.done}/30 paras`, "quran"),
+            statCard("Hifz", `${d.hifz.done}/30 paras`, "quran", { tone: d.hifz.done === 30 ? "good" : "" }),
+            statCard("Tarjuma-tul-Quran", `${t.percentage}%`, "book"),
+            statCard("Duas, Kalimas, Tajweed…", `${checkDone}/${checkTotal}`, "list"),
+            statCard("Khatms & completions", d.khatms.length, "award", { tone: d.khatms.length ? "good" : "" })),
+          d.khatms.length ? h("div", { class: "card" }, h("h3", {}, "Latest completions"), h("ul", { class: "list" }, d.khatms.slice(0, 5).map((k: any) => h("li", {}, `${k.kind_display} #${k.number}`, h("span", { class: "muted" }, fmtDate(k.completed_on)))))) : null),
+
+        qaida: () => h("div", { class: "card flush" }, table([
+          { label: "Takhti", render: (l: any) => l.number, cls: "num" },
+          { label: "Lesson", render: (l: any) => h("div", {}, l.title, l.title_arabic ? h("div", { class: "ar muted" }, l.title_arabic) : null) },
+          { label: "Status", render: (l: any) => badge(l.status === "passed" ? "passed" : l.status === "repeat" ? "late" : l.status, QAIDA_STATUS.find((x) => x[0] === l.status)?.[1]) },
+          { label: "Passed on", render: (l: any) => fmtDate(l.passed_on) }, { label: "Remarks", render: (l: any) => l.remarks || "" },
+          can ? { label: "", render: (l: any) => h("button", { class: "btn sm", onclick: () => editModal(`Takhti ${l.number}: ${l.title}`, QAIDA_STATUS, l.status, [{ name: "remarks", label: "Remarks", type: "text", value: l.remarks }],
+            async (b) => { const r = await post(`hifz/students/${studentId}/qaida/`, { lesson: l.id, ...b }); reload(); return r; }) }, "Update") } : null,
+        ].filter(Boolean) as any, q.lessons)),
+
+        nazra: () => paraGrid(d.nazra, studentId, "nazra", can, reload),
+        hifz: () => paraGrid(d.hifz, studentId, "hifz", can, reload),
+
+        tarjuma: () => {
+          const onlyStarted = h("input", { type: "checkbox", checked: t.ayahs_done > 0 });
+          const list = h("div", {});
+          const draw = () => clear(list, table([
+            { label: "#", render: (x: any) => x.surah, cls: "num" }, { label: "Surah", render: (x: any) => x.name.replace(/^\d+\.\s*/, "") },
+            { label: "Ayahs", render: (x: any) => `${x.ayahs_done}/${x.ayahs}`, cls: "num" }, { label: "Progress", render: (x: any) => pct(Math.round((x.ayahs_done / x.ayahs) * 100)) },
+            { label: "Status", render: (x: any) => badge(x.status === "tested" ? "passed" : x.status, TARJUMA_STATUS.find((s) => s[0] === x.status)?.[1]) },
+            { label: "Test", render: (x: any) => x.test_score ?? "—", cls: "num" },
+            can ? { label: "", render: (x: any) => h("button", { class: "btn sm", onclick: () => editModal(`Tarjuma — ${x.name}`, TARJUMA_STATUS, x.status,
+              [{ name: "ayahs_done", label: `Ayahs translated (of ${x.ayahs})`, value: x.ayahs_done, max: x.ayahs }, { name: "test_score", label: "Test score (/100)", value: x.test_score, max: 100 }],
+              async (b) => { const r = await post(`hifz/students/${studentId}/tarjuma/`, { surah: x.surah, ...b }); reload(); return r; }) }, "Update") } : null,
+          ].filter(Boolean) as any, t.surahs.filter((x: any) => !onlyStarted.checked || x.status !== "not_started")));
+          onlyStarted.onchange = draw;
+          draw();
+          return h("div", { class: "stack" },
+            h("div", { class: "card" }, h("div", { class: "row between" }, h("h3", { style: { margin: 0 } }, `${t.percentage}% of the Qur'an translated`), h("span", { class: "muted" }, `${t.ayahs_done.toLocaleString()} / ${t.total_ayahs.toLocaleString()} ayahs · ${t.completed} surahs completed · ${t.tested} tested`)),
+              h("div", { class: "progress", style: { marginTop: ".6rem" } }, h("span", { style: { width: `${t.percentage}%` } }))),
+            h("div", { class: "card flush" }, h("div", { class: "toolbar" }, h("label", { style: { fontWeight: 500, margin: 0 } }, onlyStarted, " Show only started surahs")), list));
+        },
+
+        checklists: () => h("div", { class: "stack" }, d.checklists.map((g: any) => h("details", { class: "card", open: g.done > 0 },
+          h("summary", { style: { cursor: "pointer", fontWeight: 700 } }, `${g.label} — ${g.done}/${g.items.length}`),
+          h("ul", { class: "list", style: { marginTop: ".75rem" } }, g.items.map((it: any) => h("li", {},
+            h("div", { style: { flex: 1 } }, h("strong", {}, it.title), it.arabic ? h("div", { class: "ar", style: { fontSize: "1.25rem", lineHeight: 1.9 } }, it.arabic) : null,
+              it.translation ? h("div", { class: "small muted" }, it.translation) : null, it.reference ? h("div", { class: "small muted" }, `— ${it.reference}`) : null),
+            h("div", { class: "row", style: { alignItems: "flex-start" } },
+              badge(it.status === "tested" ? "passed" : it.status === "learned" ? "completed" : it.status === "learning" ? "in_progress" : "not_started", CHECK_STATUS.find((s) => s[0] === it.status)?.[1]),
+              it.score != null ? h("span", { class: "small" }, `${it.score}/10`) : null,
+              can ? h("button", { class: "btn sm", onclick: () => editModal(it.title, CHECK_STATUS, it.status, [{ name: "score", label: "Score (/10)", value: it.score, max: 10 }],
+                async (b) => { const r = await post(`hifz/students/${studentId}/checklist/`, { item: it.id, ...b }); reload(); return r; }) }, "Update") : null))))))),
+
+        khatms: () => {
+          const add = () => {
+            const kind = selectEl(opts([["nazra", "Nazra khatm"], ["hifz", "Hifz completion"], ["tarjuma", "Tarjuma completion"], ["dor", "Dor / revision cycle"], ["qaida", "Noorani Qaida completion"]]), "dor");
+            const on = h("input", { type: "date", value: today() });
+            const rem = h("input", { placeholder: "Remarks" });
+            const go = h("button", { class: "btn primary" }, "Record");
+            const m = modal("Record a completion", h("div", {}, h("div", { class: "field" }, h("label", {}, "Kind"), kind), h("div", { class: "field" }, h("label", {}, "Completed on"), on), h("div", { class: "field" }, h("label", {}, "Remarks"), rem)), { actions: [go] });
+            go.onclick = async () => { if (await busy(go, () => post(`hifz/students/${studentId}/khatm/`, { kind: kind.value, completed_on: on.value, remarks: rem.value }))) { m.close(); reload(); } };
+          };
+          return h("div", { class: "stack" }, can ? h("div", {}, h("button", { class: "btn primary", onclick: add }, "Record a completion / Dor")) : null,
+            h("div", { class: "card flush" }, table([{ label: "Completion", render: (k: any) => k.kind_display }, { label: "#", render: (k: any) => k.number, cls: "num" },
+              { label: "Started", render: (k: any) => fmtDate(k.started_on) }, { label: "Completed", render: (k: any) => fmtDate(k.completed_on) }, { label: "Remarks", render: (k: any) => k.remarks || "" }],
+              d.khatms, { emptyText: "No completions recorded yet." })),
+            h("p", { class: "small muted" }, "Certificates for Qaida, Nazra, Hifz and Tarjuma completion are issued automatically and appear under the student's certificates."));
+        },
+
+        log: async () => {
+          const r = await get(`hifz/students/${studentId}/`);
+          const trend = r.records.slice().reverse().slice(-20).map((x: any) => ({ label: new Date(`${x.date}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" }), value: x.mistakes }));
+          return h("div", { class: "stack" }, trend.length ? h("div", { class: "card" }, lineChart("Mistakes per lesson (last 20)", trend)) : null,
+            h("div", { class: "card flush" }, table([
+              { label: "Date", render: (x: any) => fmtDate(x.date) }, { label: "Program", render: (x: any) => x.program },
+              { label: "Sabaq", render: (x: any) => h("div", {}, x.sabaq || "—", x.sabaq_quality ? h("div", { class: "small muted" }, x.sabaq_quality) : null) },
+              { label: "Sabqi", render: (x: any) => h("div", {}, x.sabqi || "—", x.sabqi_quality ? h("div", { class: "small muted" }, x.sabqi_quality) : null) },
+              { label: "Manzil", render: (x: any) => h("div", {}, x.manzil || "—", x.manzil_quality ? h("div", { class: "small muted" }, x.manzil_quality) : null) },
+              { label: "Mistakes", render: (x: any) => x.mistakes, cls: "num" }, { label: "Atkan", render: (x: any) => x.hesitations, cls: "num" },
+              { label: "Tajweed", render: (x: any) => x.tajweed, cls: "num" }, { label: "Remarks", render: (x: any) => x.remarks }, { label: "Teacher", render: (x: any) => x.teacher }],
+              r.records, { emptyText: "No daily records yet." })));
+        },
+      };
+      const tabList = [["overview", "Overview"], ["qaida", "Noorani Qaida"], ["nazra", "Nazra"], ["hifz", "Hifz"], ["tarjuma", "Tarjuma"], ["checklists", "Tajweed, duas & more"], ["khatms", "Khatm register"], ["log", "Daily log"]];
+      clear(container, h("div", { class: "row between", style: { marginBottom: ".5rem" } }, h("h2", { style: { margin: 0 } }, d.student.name), h("span", { class: "muted" }, d.student.section)),
+        tabs(tabList.map(([key, label]) => ({ key, label })), async (k) => { current = k; clear(body, h("div", { class: "spinner" })); clear(body, await views[k]()); }, current), body);
+    }
+
+    async function teacherDesk(container: HTMLElement, sections: any[]) {
+      const sec = selectEl(sections.map((x: any) => ({ value: x.id, label: x.label })), param("section") || sections[0].id, { style: { width: "auto" } });
+      const body = h("div", {});
+      let mode = "daily";
+
+      async function daily() {
+        const prog = selectEl(opts(PROGRAMS), param("program") || "hifz", { style: { width: "auto" } });
+        const date = h("input", { type: "date", value: today(), max: today(), style: { width: "auto" } });
+        const sheet = h("div", {});
+        const load = async () => {
+          clear(sheet, h("div", { class: "spinner" }));
+          const d = await get("hifz/daily/", { section: sec.value, date: date.value, program: prog.value });
+          const q = (name: string, r: any) => selectEl(d.qualities.map((x: any) => ({ value: x.value, label: x.label.split(" (")[0] })), r[name], { class: "inline-input", onchange: (e: any) => (r[name] = e.target.value) }, "—");
+          const num = (name: string, r: any, w = 60, attrs: any = {}) => h("input", { type: "number", min: 0, class: "inline-input", style: { width: `${w}px` }, value: r[name] ?? "", oninput: (e: any) => (r[name] = e.target.value === "" ? null : Number(e.target.value)), ...attrs });
+          const txt = (name: string, r: any, w = 90, ph = "") => h("input", { class: "inline-input", style: { width: `${w}px` }, placeholder: ph, value: r[name] ?? "", oninput: (e: any) => (r[name] = e.target.value) });
+          const surah = (r: any) => selectEl(d.surahs, r.sabaq_surah, { class: "inline-input", style: { maxWidth: "150px" }, onchange: (e: any) => (r.sabaq_surah = e.target.value ? Number(e.target.value) : null) }, "Surah");
+          const byAyah = ["hifz", "murajaah", "tajweed", "tarjuma"].includes(prog.value);
+          const revision = ["hifz", "murajaah", "nazra"].includes(prog.value);
+          const save = h("button", { class: "btn primary" }, "Save all");
+          save.onclick = () => busy(save, () => post("hifz/daily/", { section: Number(sec.value), date: date.value, program: prog.value, records: d.rows.map(({ name, admission_no, previous, ...rest }: any) => rest) }));
+          const head = ["Student", prog.value === "tarjuma" ? "Lesson (surah / ayahs)" : "Sabaq", "Quality", ...(revision ? ["Sabqi (para / qty)", "Quality", "Manzil", "Quality"] : []), "Mistakes", "Atkan", prog.value === "tarjuma" ? "Understanding (0-10)" : "Tajweed", "Remarks"];
+          clear(sheet, h("div", { class: "card flush" }, h("div", { class: "toolbar" }, h("span", { class: "muted small" }, prog.value === "tarjuma" ? "Record the ayahs translated today; update surah progress from each student's Tarjuma tab." : "Sabaq = new lesson · Sabqi = recent revision · Manzil = old revision"), h("div", { style: { flex: 1 } }), save),
+            h("div", { class: "table-wrap" }, h("table", { style: { fontSize: "12.5px" } }, h("thead", {}, h("tr", {}, head.map((x) => h("th", {}, x)))),
+              h("tbody", {}, d.rows.map((r: any) => h("tr", {},
+                h("td", { style: { minWidth: "150px" } }, h("a", { href: `/hifz?student=${r.student}` }, h("strong", {}, r.name)), r.previous ? h("div", { class: "small muted" }, `Last: ${fmtDate(r.previous.date)}${r.previous.sabaq_surah ? ` · S${r.previous.sabaq_surah}:${r.previous.sabaq_to_ayah || ""}` : ""}`) : null),
+                h("td", { class: "nowrap" }, byAyah ? [surah(r), " ", num("sabaq_from_ayah", r, 56, { placeholder: "from" }), "–", num("sabaq_to_ayah", r, 56, { placeholder: "to" })] : [num("sabaq_lines", r, 70, { placeholder: "lines" })]),
+                h("td", {}, q("sabaq_quality", r)),
+                revision ? [h("td", { class: "nowrap" }, num("sabqi_juz", r, 52, { max: 30, placeholder: "para" }), " ", txt("sabqi_quantity", r, 80, "¼ para")), h("td", {}, q("sabqi_quality", r)),
+                  h("td", {}, txt("manzil_juz", r, 70, "e.g. 1-3")), h("td", {}, q("manzil_quality", r))] : null,
+                h("td", {}, num("mistakes", r)), h("td", {}, num("hesitations", r)), h("td", {}, num("tajweed_rating", r, 60, { max: 10 })), h("td", {}, txt("remarks", r, 140)))))))));
+        };
+        [prog, date].forEach((e) => e.addEventListener("change", load));
+        clear(body, h("div", { class: "row", style: { marginBottom: "1rem" } }, prog, date), sheet);
+        load();
+      }
+
+      async function overview() {
+        clear(body, h("div", { class: "spinner" }));
+        const rows = await get(`hifz/sections/${sec.value}/`);
+        const extra = await Promise.all(rows.map((r: any) => get(`hifz/students/${r.student}/programs/`).catch(() => null)));
+        clear(body, h("div", { class: "card flush" }, table([
+          { label: "Student", render: (_r: any, i: number) => h("a", { href: `/hifz?student=${rows[i].student}` }, rows[i].name) },
+          { label: "Qaida", render: (_r: any, i: number) => (extra[i] ? (extra[i].qaida.completed ? "✓ done" : `${extra[i].qaida.passed}/${extra[i].qaida.total}`) : "—") },
+          { label: "Nazra", render: (_r: any, i: number) => (extra[i] ? `${extra[i].nazra.done}/30` : "—") },
+          { label: "Hifz", render: (r: any) => pct(Math.round((r.memorized / 30) * 100)) },
+          { label: "Tarjuma", render: (_r: any, i: number) => (extra[i] ? `${extra[i].tarjuma.percentage}%` : "—") },
+          { label: "Khatms", render: (_r: any, i: number) => (extra[i] ? extra[i].khatms.length : "—"), cls: "num" },
+          { label: "Last lesson", render: (r: any) => fmtDate(r.last_date) }], rows)));
+      }
+
+      async function checklistSheet() {
+        const items = (await get("checklist-items/", { page_size: 500, is_active: true })).results;
+        const cats = [...new Map(items.map((i: any) => [i.category, i.category_display])).entries()];
+        const cat = selectEl(cats.map(([v, l]) => ({ value: v, label: l as string })), cats[0]?.[0], { style: { width: "auto" } });
+        const item = h("select", { style: { width: "auto", maxWidth: "380px" } });
+        const sheet = h("div", {});
+        const fillItems = () => { clear(item, items.filter((i: any) => i.category === cat.value).map((i: any) => h("option", { value: i.id }, i.title))); load(); };
+        const load = async () => {
+          if (!item.value) return clear(sheet, empty("No items in this category."));
+          const d = await get("hifz/checklist-sheet/", { section: sec.value, item: item.value });
+          const save = h("button", { class: "btn primary" }, "Save");
+          save.onclick = () => busy(save, () => post("hifz/checklist-sheet/", { section: Number(sec.value), item: Number(item.value), records: d.rows.map((r: any) => ({ student: r.student, status: r.status, score: r.score })) }));
+          clear(sheet, h("div", { class: "card", style: { marginBottom: "1rem" } }, h("h3", {}, d.item.title), d.item.arabic ? h("div", { class: "ar", style: { fontSize: "1.5rem", lineHeight: 2 } }, d.item.arabic) : null,
+            d.item.translation ? h("p", { class: "muted" }, d.item.translation) : null, d.item.reference ? h("p", { class: "small muted" }, `— ${d.item.reference}`) : null),
+            h("div", { class: "card flush" }, h("div", { class: "toolbar" }, h("button", { class: "btn sm success", onclick: () => { d.rows.forEach((r: any) => r.status === "not_started" && (r.status = "learned")); load2(); } }, "Mark unmarked as learned"), h("div", { style: { flex: 1 } }), save),
+              h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Student"), h("th", {}, "Status"), h("th", {}, "Score /10"))), h("tbody", { id: "cl" }))));
+          const load2 = () => clear(document.getElementById("cl")!, d.rows.map((r: any) => h("tr", {}, h("td", {}, r.name),
+            h("td", {}, selectEl(opts(CHECK_STATUS), r.status, { class: "inline-input", onchange: (e: any) => (r.status = e.target.value) })),
+            h("td", {}, h("input", { type: "number", min: 0, max: 10, class: "inline-input", style: { width: "70px" }, value: r.score ?? "", oninput: (e: any) => (r.score = e.target.value === "" ? null : Number(e.target.value)) })))));
+          load2();
+        };
+        cat.onchange = fillItems; item.onchange = load;
+        clear(body, h("div", { class: "row", style: { marginBottom: "1rem" } }, cat, item, h("a", { class: "btn ghost", href: "/m/checklist-items" }, "Manage list")), sheet);
+        fillItems();
+      }
+
+      const render = () => ({ daily, overview, checklist: checklistSheet } as any)[mode]();
+      sec.onchange = () => render();
+      clear(container, h("div", { class: "row", style: { marginBottom: "1rem" } }, sec, h("a", { class: "btn", href: "/m/khatm-register" }, "Khatm register"), h("a", { class: "btn", href: "/m/qaida-lessons" }, "Qaida lessons")),
+        tabs([{ key: "daily", label: "Daily entry" }, { key: "overview", label: "Halqa progress" }, { key: "checklist", label: "Duas, Kalimas & Tajweed sheet" }], (k) => { mode = k; render(); }), body);
+    }
+
+    ready.then(async (u) => {
+      const student = param("student");
+      const head = (sub: string) => h("div", { class: "page-head" }, h("div", {}, h("h1", {}, "Quran programs"), h("p", {}, sub)));
+      const body = h("div", {});
+      if (u.role === "student") { clear(root, head("Noorani Qaida, Nazra, Hifz, Tarjuma, Tajweed and memorisation — your progress."), body); return studentPrograms(body, u.student!.id); }
+      if (u.role === "parent") {
+        const kids = u.children || [];
+        if (!kids.length) return clear(root, head(""), empty("No children linked."));
+        const sel = selectEl(kids.map((k: any) => ({ value: k.id, label: k.name })), student || kids[0].id, { style: { width: "auto" } });
+        sel.onchange = () => studentPrograms(body, Number(sel.value));
+        clear(root, head("Your children's Quran education."), h("div", { style: { marginBottom: "1rem" } }, sel), body);
+        return studentPrograms(body, Number(sel.value));
+      }
+      if (student) { clear(root, head("Student progress"), h("p", {}, h("a", { href: "/hifz" }, "← Back to halqa")), body); return studentPrograms(body, Number(student), param("tab") || undefined); }
+      const sections = await get("academics/my-sections/");
+      if (!sections.length) return clear(root, head(""), empty("You have no halaqat assigned."));
+      clear(root, head("Daily lessons for Qaida, Nazra, Hifz, Tarjuma and Tajweed, plus checklists for duas, Kalimas and Tajweed rules."), body);
+      teacherDesk(body, sections);
+    });
+  </script>
+</Portal>

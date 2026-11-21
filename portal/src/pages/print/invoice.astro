@@ -1,0 +1,25 @@
+---
+import Print from "../../layouts/Print.astro";
+---
+<Print title="Fee invoice">
+  <script>
+    import { get } from "../../lib/api";
+    import { requireUser } from "../../lib/guard";
+    import { clear, fmtDate, fmtMoney, h, param } from "../../lib/ui";
+    requireUser().then(async () => {
+      const d = await get(`finance/invoices/${param("id")}/detail/`);
+      const c = d.institution.currency;
+      const copy = (label: string) => h("div", { class: "print-page", style: { marginBottom: "1rem" } },
+        h("div", { class: "print-head" }, h("div", {}, h("h2", { style: { margin: 0 } }, d.institution.name), h("div", { class: "small muted" }, d.institution.address), h("div", { class: "small muted" }, d.institution.phone)), h("div", { class: "right" }, h("strong", {}, "FEE CHALLAN"), h("div", { class: "small" }, label))),
+        h("dl", { class: "kv" }, h("dt", {}, "Invoice no"), h("dd", {}, d.invoice_no), h("dt", {}, "Student"), h("dd", {}, `${d.student.name} (${d.student.admission_no})`), h("dt", {}, "Father's name"), h("dd", {}, d.student.father_name || "—"),
+          h("dt", {}, "Class"), h("dd", {}, d.student.section), h("dt", {}, "Title"), h("dd", {}, d.title), h("dt", {}, "Issue / due date"), h("dd", {}, `${fmtDate(d.issue_date)} / ${fmtDate(d.due_date)}`)),
+        h("table", { style: { marginTop: "1rem" } }, h("tbody", {}, d.items.map((i: any) => h("tr", {}, h("td", {}, i.description), h("td", { class: "num" }, fmtMoney(i.amount, c)))),
+          h("tr", {}, h("td", {}, "Discount / scholarship"), h("td", { class: "num" }, `− ${fmtMoney(d.discount, c)}`)), h("tr", {}, h("td", {}, "Late fee"), h("td", { class: "num" }, fmtMoney(d.fine, c))),
+          h("tr", { style: { fontWeight: 700 } }, h("td", {}, "Total payable"), h("td", { class: "num" }, fmtMoney(d.total, c))), h("tr", {}, h("td", {}, "Paid"), h("td", { class: "num" }, fmtMoney(d.paid, c))),
+          h("tr", { style: { fontWeight: 700 } }, h("td", {}, "Balance"), h("td", { class: "num" }, fmtMoney(d.balance, c))))),
+        d.institution.bank ? h("p", { class: "small", style: { whiteSpace: "pre-wrap" } }, d.institution.bank) : null,
+        h("div", { class: "row between", style: { marginTop: "2rem" } }, h("span", { class: "small" }, `Status: ${d.status_display}`), h("span", {}, "______________ Cashier")));
+      clear(document.getElementById("doc")!, copy("Parent copy"), copy("Office copy"));
+    });
+  </script>
+</Print>

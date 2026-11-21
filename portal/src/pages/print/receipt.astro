@@ -1,0 +1,20 @@
+---
+import Print from "../../layouts/Print.astro";
+---
+<Print title="Receipt">
+  <script>
+    import { get } from "../../lib/api";
+    import { requireUser } from "../../lib/guard";
+    import { clear, fmtDate, fmtMoney, h, param } from "../../lib/ui";
+    requireUser().then(async () => {
+      const d = await get(`finance/payments/${param("id")}/receipt/`);
+      const c = d.institution.currency;
+      clear(document.getElementById("doc")!, h("div", { class: "print-page" },
+        h("div", { class: "print-head" }, h("div", {}, h("h2", { style: { margin: 0 } }, d.institution.name), h("div", { class: "small muted" }, d.institution.address)), h("div", { class: "right" }, h("strong", {}, "PAYMENT RECEIPT"), h("div", {}, d.receipt_no))),
+        h("dl", { class: "kv" }, h("dt", {}, "Received from"), h("dd", {}, `${d.invoice.student.name} (${d.invoice.student.admission_no})`), h("dt", {}, "Against invoice"), h("dd", {}, `${d.invoice.invoice_no} — ${d.invoice.title}`),
+          h("dt", {}, "Amount"), h("dd", {}, h("strong", { style: { fontSize: "1.3rem" } }, fmtMoney(d.amount, c))), h("dt", {}, "Date"), h("dd", {}, fmtDate(d.date)), h("dt", {}, "Method"), h("dd", {}, `${d.method}${d.reference ? " · " + d.reference : ""}`),
+          h("dt", {}, "Remaining balance"), h("dd", {}, fmtMoney(d.invoice.balance, c)), h("dt", {}, "Status"), h("dd", {}, d.status)),
+        h("div", { class: "row between", style: { marginTop: "3rem" } }, h("span", { class: "small muted" }, "JazakAllah khair for your payment."), h("span", {}, `______________ ${d.received_by || "Accounts"}`))));
+    });
+  </script>
+</Print>

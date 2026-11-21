@@ -1,0 +1,107 @@
+---
+import Portal from "../../layouts/Portal.astro";
+---
+<Portal title="Biometric attendance">
+  <div class="page-head"><div><h1>Biometric attendance</h1><p>Fingerprint, face and card machines. Punches become staff and student attendance automatically.</p></div></div>
+  <div id="root"><div class="spinner"></div></div>
+  <script>
+    import { api, get, post } from "../../lib/api";
+    import { mountCrud, openForm } from "../../lib/crud";
+    import { ready } from "../../lib/shell";
+    import { badge, busy, clear, fmtDateTime, fmtTime, h, selectEl, table, tabs, today } from "../../lib/ui";
+    const root = document.getElementById("root")!;
+    const code = (t: string) => h("code", { style: { background: "var(--surface-2)", padding: ".1rem .4rem", borderRadius: "4px", userSelect: "all" } }, t);
+
+    async function statusTab(body: HTMLElement) {
+      const d = await get("biometric/status/");
+      clear(body, h("div", { class: "stack" },
+        h("div", { class: "grid cols-4" },
+          h("div", { class: "card stat" }, h("div", {}, h("div", { class: "val" }, d.devices.filter((x: any) => x.online).length + "/" + d.devices.length), h("div", { class: "lbl" }, "Devices online (last 10 min)"))),
+          h("div", { class: "card stat good" }, h("div", {}, h("div", { class: "val" }, d.today_total), h("div", { class: "lbl" }, "Punches today"))),
+          h("div", { class: `card stat ${d.today_unmatched ? "warn" : ""}` }, h("div", {}, h("div", { class: "val" }, d.today_unmatched), h("div", { class: "lbl" }, "Unknown-PIN punches today"))),
+          h("div", { class: "card stat" }, h("div", {}, h("div", { class: "val" }, d.enrolled), h("div", { class: "lbl" }, "People enrolled")))),
+        d.unmatched_pins.length ? h("div", { class: "alert warn" }, "Punches from PINs not linked to anyone: ", d.unmatched_pins.map((p: string) =>
+          h("button", { class: "btn sm", style: { margin: "0 .25rem" }, onclick: () => openForm("biometric-enrollments", null, () => statusTab(body), { pin: p }) }, `Link ${p}`))) : null,
+        h("div", { class: "card flush" }, table([
+          { label: "Device", render: (x: any) => h("div", {}, h("strong", {}, x.name), h("div", { class: "small muted" }, `${x.serial_number}${x.location ? " · " + x.location : ""}`)) },
+          { label: "Mode", render: (x: any) => x.protocol.split(" — ")[0] }, { label: "For", render: (x: any) => x.audience },
+          { label: "Status", render: (x: any) => (!x.is_active ? badge("cancelled", "disabled") : x.protocol_key === "push" || x.protocol_key === "api" ? (x.online ? badge("active", "online") : badge("pending", x.last_seen ? "offline" : "never connected")) : badge("info", x.protocol_key)) },
+          { label: "Last contact", render: (x: any) => fmtDateTime(x.last_seen) },
+          { label: "Today", render: (x: any) => `${x.today} punch(es)${x.first_today ? ` · ${fmtTime(x.first_today)}–${fmtTime(x.last_today)}` : ""}` },
+          { label: "", render: (x: any) => x.protocol_key === "pull" ? h("button", { class: "btn sm", onclick: (e: any) => busy(e.currentTarget, () => post(`biometric-devices/${x.id}/pull_now/`)).then(() => statusTab(body)) }, "Pull now") : "" },
+        ], d.devices, { emptyText: "No devices registered yet — add one in the Devices tab." })),
+        h("div", { class: "grid cols-2" },
+          h("div", { class: "card" }, h("h3", {}, "Set up a ZKTeco / eSSL device (push — recommended)"),
+            h("ol", { style: { paddingLeft: "1.2rem", lineHeight: 1.9 } },
+              h("li", {}, "Register the device here (Devices tab) with its exact serial number (device menu → System Info → Device Info)."),
+              h("li", {}, "On the device: Menu → COMM. → Cloud Server Setting (some models: ADMS)."),
+              h("li", {}, "Server address: ", code(d.push_server.address), " · Server port: ", code(d.push_server.port), ". Enable HTTPS if this portal uses https."),
+              h("li", {}, "Enrol each person on the device with the same User ID as their PIN here (Enrolments tab → ", h("em", {}, "Create PINs automatically"), ")."),
+              h("li", {}, "The device shows a cloud icon when connected; punches appear here within seconds.")),
+            h("p", { class: "small muted" }, "The server must be reachable from the device (public IP / domain or same network).")),
+          h("div", { class: "card" }, h("h3", {}, "Other options"),
+            h("p", {}, h("strong", {}, "LAN pull (older ZK models): "), "set the device to Pull mode with its IP address and port 4370. ",
+              d.pull_available ? badge("active", "pyzk installed") : h("span", {}, badge("pending", "needs pyzk"), " — run ", code("pip install pyzk"), " on the server."),
+              " Schedule ", code("python manage.py biometric_pull"), " every few minutes."),
+            h("p", {}, h("strong", {}, "Any other brand / software: "), "POST JSON to ", code(d.api_url), " with header ", code("X-Device-Key: <device API key>"), " and body ",
+              code('{"punches":[{"pin":"12","time":"2026-11-06 07:58:00","direction":"in"}]}'), ". Each device's API key is shown in its record."),
+            h("p", {}, h("strong", {}, "No network? "), "Export the log from the device (USB) or its software and upload it in the Import tab (CSV / TXT / attlog.dat)."),
+            h("p", {}, h("strong", {}, "Nightly: "), "schedule ", code("python manage.py biometric_close_day"), " (add ", code("--students"), " to include students) to mark enrolled people without any punch as absent.")))));
+    }
+
+    function importTab(body: HTMLElement) {
+      const file = h("input", { type: "file", accept: ".csv,.txt,.dat,.tsv" });
+      const dev = h("div", {});
+      get("biometric-devices/", { page_size: 100 }).then((r) => clear(dev, selectEl(r.results.map((x: any) => ({ value: x.id, label: x.name })), "", { id: "imp-dev" }, "— not linked to a device —")));
+      const go = h("button", { class: "btn primary" }, "Import");
+      const out = h("div", {});
+      go.onclick = async () => {
+        if (!file.files?.[0]) return;
+        const fd = new FormData();
+        fd.append("file", file.files[0]);
+        const sel = document.getElementById("imp-dev") as HTMLSelectElement;
+        if (sel?.value) fd.append("device", sel.value);
+        const r = await busy(go, () => api("biometric/import/", { method: "POST", body: fd }));
+        if (r) clear(out, h("div", { class: "alert good" }, r.detail), r.errors?.length ? h("div", { class: "alert warn" }, h("strong", {}, "Some lines could not be read:"), h("ul", {}, r.errors.map((e: string) => h("li", {}, e)))) : null);
+      };
+      clear(body, h("div", { class: "card", style: { maxWidth: "760px" } }, h("h3", {}, "Import exported punch logs"),
+        h("p", { class: "muted" }, "Accepts CSV/TXT exports from ZKTeco, eSSL, Hikvision, Anviz and similar software, or the device's attlog.dat (USB). Columns are detected by name (PIN / AC-No / User ID, Date/Time or Date + Time, Status / State). Duplicate punches are ignored, so re-importing is safe."),
+        h("div", { class: "field" }, h("label", {}, "Log file"), file), h("div", { class: "field" }, h("label", {}, "Device (optional)"), dev), go, out,
+        h("details", { style: { marginTop: "1rem" } }, h("summary", {}, "Example format"), h("pre", { class: "small" }, "PIN,DateTime,Status\n12,2026-11-06 07:58:00,In\n12,2026-11-06 14:02:00,Out\n\n# or ZK attlog.dat (tab separated)\n12\t2026-11-06 07:58:00\t0\t1\t0"))));
+    }
+
+    function processTab(body: HTMLElement) {
+      const date = h("input", { type: "date", value: today(), max: today(), style: { width: "auto" } });
+      const staff = h("input", { type: "checkbox", checked: true });
+      const students = h("input", { type: "checkbox" });
+      const reproc = h("button", { class: "btn" }, "Re-process punches for this date");
+      reproc.onclick = () => busy(reproc, () => post("biometric/process/", { date: date.value, include_applied: true }));
+      const close = h("button", { class: "btn gold" }, "Close day (mark non-punchers absent)");
+      close.onclick = () => busy(close, () => post("biometric/close-day/", { date: date.value, staff: staff.checked, students: students.checked }));
+      clear(body, h("div", { class: "card", style: { maxWidth: "760px" } }, h("h3", {}, "Process & close a day"),
+        h("div", { class: "row", style: { marginBottom: "1rem" } }, h("span", {}, "Date"), date),
+        h("p", {}, reproc, " ", h("span", { class: "muted small" }, "Use after changing PINs, duty times or leaves.")),
+        h("div", { class: "row" }, h("label", { style: { fontWeight: 500, margin: 0 } }, staff, " Staff"), h("label", { style: { fontWeight: 500, margin: 0 } }, students, " Students"), close),
+        h("p", { class: "muted small", style: { marginTop: ".75rem" } }, "Only people enrolled with a PIN who have no punch and no attendance record (e.g. leave) are marked absent. Holidays are skipped.")));
+    }
+
+    async function enrolTab(body: HTMLElement) {
+      const box = h("div", {});
+      const auto = (who: string) => async (e: any) => { if (await busy(e.currentTarget, () => post("biometric/auto-enroll/", { who, scheme: "id" }))) mountCrud(box, "biometric-enrollments", { title: false }); };
+      clear(body, h("div", { class: "card row", style: { marginBottom: "1rem" } }, h("span", {}, "Create PINs automatically for everyone without one:"),
+        h("button", { class: "btn sm", onclick: auto("staff") }, "Staff"), h("button", { class: "btn sm", onclick: auto("students") }, "Students"), h("button", { class: "btn sm", onclick: auto("all") }, "Everyone"),
+        h("span", { class: "small muted" }, "PIN = portal user ID. Then enrol the same User ID's fingerprint / face / card on the device.")), box);
+      mountCrud(box, "biometric-enrollments", { title: false });
+    }
+
+    ready.then(() => {
+      const body = h("div", {});
+      const views: Record<string, () => any> = {
+        status: () => statusTab(body), devices: () => mountCrud(body, "biometric-devices", { title: false }), enrol: () => enrolTab(body),
+        log: () => mountCrud(body, "biometric-punches", { title: false }), import: () => importTab(body), process: () => processTab(body),
+      };
+      clear(root, tabs([{ key: "status", label: "Status & setup" }, { key: "devices", label: "Devices" }, { key: "enrol", label: "Enrolments (PINs)" },
+        { key: "log", label: "Punch log" }, { key: "import", label: "Import CSV" }, { key: "process", label: "Process & close day" }], (k) => { clear(body, h("div", { class: "spinner" })); views[k](); }), body);
+    });
+  </script>
+</Portal>

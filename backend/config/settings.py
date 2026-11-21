@@ -159,7 +159,13 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
 }
 
-CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:4321,http://127.0.0.1:4321,http://localhost:4322,http://127.0.0.1:4322")
+from urllib.parse import urlparse as _urlparse  # noqa: E402
+
+# Skip entries that resolved to nothing (e.g. "https://" when a Railway reference like ${{website.RAILWAY_PUBLIC_DOMAIN}}
+# is empty because the service has no domain yet or is named differently).
+CORS_ALLOWED_ORIGINS = [o.rstrip("/") for o in env_list(
+    "CORS_ALLOWED_ORIGINS", "http://localhost:4321,http://127.0.0.1:4321,http://localhost:4322,http://127.0.0.1:4322")
+    if _urlparse(o).scheme and _urlparse(o).netloc]
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [*CORS_ALLOWED_ORIGINS, *env_list("CSRF_TRUSTED_ORIGINS", "")]
 if RAILWAY_PUBLIC_DOMAIN:

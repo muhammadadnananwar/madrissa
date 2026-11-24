@@ -54,6 +54,7 @@ class Student(TimeStamped):
     class Status(models.TextChoices):
         ACTIVE = "active", "Active"
         SUSPENDED = "suspended", "Suspended"
+        STRUCK_OFF = "struck_off", "Struck off (uninformed absence)"
         LEFT = "left", "Left / Withdrawn"
         GRADUATED = "graduated", "Graduated (Fazil)"
         TRANSFERRED = "transferred", "Transferred"

@@ -508,3 +508,97 @@ class WebsiteApiTests(DemoDataTestCase):
         # students cannot edit website content
         self.assertEqual(self.client_for(User.objects.filter(role=R.STUDENT).first().username)
                          .post("/api/web-news/", {"title": "x", "content": "y"}, format="json").status_code, 403)
+
+
+class UninformedAbsenceRuleTests(DemoDataTestCase):
+    """Student strike-off after consecutive uninformed absences; staff fine above the monthly limit; payroll."""
+
+    def _working_days(self, month):
+        from finance.services import working_days
+        return working_days(month)
+
+    def _student(self):
+        from people.models import Student
+        return Student.objects.filter(status="active", section__isnull=False).select_related("user").first()
+
+    def _mark(self, student, days, status="absent"):
+        from attendance.models import StudentAttendance
+        for d in days:
+            StudentAttendance.objects.filter(student=student, date=d, subject__isnull=True).delete()
+            StudentAttendance.objects.create(student=student, section=student.section, date=d, status=status)
+
+    def test_student_struck_off_after_consecutive_absences_and_reinstated(self):
+        from datetime import date
+        from website.models import SiteSettings
+        cfg = SiteSettings.get(); cfg.strike_off_after_days = 3; cfg.strike_off_enabled = True; cfg.save()
+        days = self._working_days(date(2025, 3, 1))[:5]
+        st = self._student()
+        self._mark(st, days[:2])                       # 2 absences: still active
+        self._mark(st, days[2:3], status="leave")      # approved leave breaks the run
+        self._mark(st, days[3:5])                      # 2 more: still active
+        st.refresh_from_db()
+        self.assertEqual(st.status, "active")
+        self._mark(st, days[2:3])                      # the leave day corrected to absent -> 5 in a row
+        st.refresh_from_db()
+        self.assertEqual(st.status, "struck_off")
+        self.assertIn("consecutive", st.leaving_reason)
+        # reinstate from the portal
+        r = self.client_for("admin").post(f"/api/students/{st.id}/set_status/", {"status": "active", "reason": "Guardian met"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        st.refresh_from_db()
+        self.assertEqual((st.status, st.leaving_date), ("active", None))
+
+    def test_strike_off_can_be_switched_off(self):
+        from datetime import date
+        from website.models import SiteSettings
+        cfg = SiteSettings.get(); cfg.strike_off_enabled = False; cfg.save()
+        st = self._student()
+        self._mark(st, self._working_days(date(2025, 4, 1))[:4])
+        st.refresh_from_db()
+        self.assertEqual(st.status, "active")
+
+    def _absent(self, emp, days):
+        from attendance.models import StaffAttendance
+        for d in days:
+            StaffAttendance.objects.update_or_create(employee=emp, date=d, defaults={"status": "absent"})
+
+    def test_teacher_fine_above_monthly_limit_in_payroll(self):
+        from datetime import date
+        from decimal import Decimal
+        from communication.models import Notification
+        from finance.models import Payslip, SalaryComponent
+        from finance.services import generate_payroll
+        from people.models import Employee
+        from website.models import SiteSettings
+        cfg = SiteSettings.get()
+        cfg.staff_penalty_enabled, cfg.staff_absence_limit = True, 3
+        cfg.staff_penalty_type, cfg.staff_penalty_value, cfg.staff_penalty_per = "percent", Decimal("2"), "per_day"
+        cfg.staff_penalty_scope = "teaching"
+        cfg.save()
+        month = date(2025, 5, 1)
+        teacher = Employee.objects.filter(kind="teaching", status="active", basic_salary__gt=0).exclude(employment_type="volunteer").first()
+        clerk = Employee.objects.filter(status="active", basic_salary__gt=0).exclude(kind="teaching").exclude(employment_type="volunteer").first()
+        SalaryComponent.objects.create(employee=teacher, kind="allowance", title="House rent", calculation="percent", amount=Decimal("10"))
+        days = self._working_days(month)[:5]
+        before = Notification.objects.filter(user=teacher.user).count()
+        self._absent(teacher, days)                     # 5 absences, 3 allowed -> 2 extra
+        self._absent(clerk, days)
+        self.assertGreater(Notification.objects.filter(user=teacher.user).count(), before)  # warned on crossing the limit
+        generate_payroll(month)
+        slip = Payslip.objects.get(employee=teacher, month=month)
+        self.assertEqual(slip.penalty_deduction, (teacher.basic_salary * 2 / 100 * 2).quantize(Decimal("0.01")))
+        self.assertEqual(slip.breakdown["absence_fine"]["extra"], 2)
+        self.assertIn((teacher.basic_salary * 10 / 100).quantize(Decimal("0.01")),
+                      [Decimal(c["amount"]) for c in slip.breakdown["components"] if c["title"] == "House rent"])
+        self.assertEqual(slip.net, slip.basic + slip.allowances + slip.bonus - slip.deductions - slip.absence_deduction
+                         - slip.advance_deduction - slip.penalty_deduction)
+        self.assertEqual(Payslip.objects.get(employee=clerk, month=month).penalty_deduction, 0)  # teachers only
+        # fixed amount, once a month, all staff
+        cfg.staff_penalty_type, cfg.staff_penalty_value, cfg.staff_penalty_per, cfg.staff_penalty_scope = "fixed", Decimal("500"), "once", "all"
+        cfg.save()
+        generate_payroll(month)
+        self.assertEqual(Payslip.objects.get(employee=teacher, month=month).penalty_deduction, Decimal("500"))
+        self.assertEqual(Payslip.objects.get(employee=clerk, month=month).penalty_deduction, Decimal("500"))
+        r = self.client_for("admin").get(f"/api/finance/payslips/{slip.id}/print/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(Decimal(str(r.json()["penalty_deduction"])), Decimal("500"))

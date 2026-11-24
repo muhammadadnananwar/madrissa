@@ -83,7 +83,11 @@ class StudentViewSet(BaseModelViewSet):
         new = request.data.get("status")
         if new not in Student.Status.values:
             return Response({"detail": "Invalid status."}, status=400)
+        previous = st.status
         st.status = new
+        if new == "active" and previous in ("struck_off", "suspended"):
+            st.leaving_date = None  # reinstated
+            st.leaving_reason = f"Reinstated {timezone.localdate():%d %b %Y}: {request.data.get('reason', '')}".strip(": ")[:200]
         if new in ("left", "graduated", "transferred"):
             st.leaving_date = timezone.localdate()
             st.leaving_reason = request.data.get("reason", st.leaving_reason)

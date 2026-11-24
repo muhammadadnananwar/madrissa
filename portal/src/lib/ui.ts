@@ -70,7 +70,7 @@ const TONES: Record<string, string> = {
   pending: "warn", unpaid: "warn", partial: "warn", late: "warn", requested: "warn", draft: "warn", under_review: "warn",
   test_scheduled: "warn", waitlisted: "warn", new: "warn", open: "warn", pledged: "warn", half_day: "warn",
   absent: "bad", rejected: "bad", cancelled: "bad", overdue: "bad", failed: "bad", fail: "bad", lost: "bad",
-  suspended: "bad", left: "bad", terminated: "bad", urgent: "bad", important: "warn",
+  suspended: "bad", struck_off: "bad", left: "bad", terminated: "bad", urgent: "bad", important: "warn",
 };
 export function badge(value: any, label?: string) {
   const key = String(value ?? "").toLowerCase();

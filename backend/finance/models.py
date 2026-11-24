@@ -374,14 +374,26 @@ class SalaryComponent(TimeStamped):
         ALLOWANCE = "allowance", "Allowance"
         DEDUCTION = "deduction", "Deduction"
 
+    class Calculation(models.TextChoices):
+        FIXED = "fixed", "Fixed amount"
+        PERCENT = "percent", "Percentage of basic salary"
+
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="salary_components")
     kind = models.CharField(max_length=10, choices=Kind.choices)
     title = models.CharField(max_length=100)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    calculation = models.CharField(max_length=10, choices=Calculation.choices, default=Calculation.FIXED)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, help_text="Amount, or percent of basic salary (e.g. 10 = 10%)")
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"{self.employee}: {self.title} {self.amount}"
+        unit = "%" if self.calculation == self.Calculation.PERCENT else ""
+        return f"{self.employee}: {self.title} {self.amount}{unit}"
+
+    def value_for(self, basic):
+        """Monthly amount of this component for the given basic salary."""
+        if self.calculation == self.Calculation.PERCENT:
+            return (basic * self.amount / 100).quantize(Decimal("0.01"))
+        return self.amount
 
 
 class SalaryAdvance(TimeStamped):
@@ -423,6 +435,8 @@ class Payslip(TimeStamped):
     deductions = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     absence_deduction = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     advance_deduction = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    penalty_deduction = models.DecimalField("Absence fine", max_digits=12, decimal_places=2, default=0,
+                                            help_text="Fine for uninformed absences above the monthly limit")
     bonus = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     net = models.DecimalField(max_digits=12, decimal_places=2, default=0, editable=False)
     working_days = models.PositiveSmallIntegerField(default=0)
@@ -443,5 +457,5 @@ class Payslip(TimeStamped):
 
     def save(self, *args, **kwargs):
         self.net = (self.basic + self.allowances + self.bonus
-                    - self.deductions - self.absence_deduction - self.advance_deduction)
+                    - self.deductions - self.absence_deduction - self.advance_deduction - self.penalty_deduction)
         super().save(*args, **kwargs)

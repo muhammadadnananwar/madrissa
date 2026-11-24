@@ -285,7 +285,7 @@ class SalaryComponentViewSet(BaseModelViewSet):
     read_roles = write_roles = PAYROLL
     filterset_fields = ["employee", "kind", "is_active"]
     label, group, icon = "Allowances & Deductions", P, "sliders"
-    list_fields = ["employee", "kind", "title", "amount", "is_active"]
+    list_fields = ["employee", "kind", "title", "calculation", "amount", "is_active"]
 
 
 class SalaryAdvanceViewSet(BaseModelViewSet):
@@ -335,7 +335,7 @@ class PayslipViewSet(BaseModelViewSet):
     scope = staticmethod(own_employee)
     filterset_fields = ["employee", "month", "status"]
     group, icon, menu_roles = P, "file", STAFF_ROLES
-    list_fields = ["employee", "month", "basic", "allowances", "deductions", "net", "status", "paid_on"]
+    list_fields = ["employee", "month", "basic", "allowances", "deductions", "absence_deduction", "penalty_deduction", "net", "status", "paid_on"]
     ui_actions = [{"name": "approve", "label": "Approve", "roles": PAYROLL},
                   {"name": "mark_paid", "label": "Mark paid", "style": "success", "roles": FINANCE,
                    "confirm": "Record salary as paid?"}]
@@ -506,7 +506,8 @@ class PayslipPrintView(APIView):
         return Response({"id": p.id, "month": p.month, "status": p.get_status_display(), "paid_on": p.paid_on,
                          "method": p.get_method_display(), "basic": p.basic, "allowances": p.allowances,
                          "deductions": p.deductions, "absence_deduction": p.absence_deduction,
-                         "advance_deduction": p.advance_deduction, "bonus": p.bonus, "net": p.net,
+                         "advance_deduction": p.advance_deduction, "penalty_deduction": p.penalty_deduction,
+                         "bonus": p.bonus, "net": p.net,
                          "working_days": p.working_days, "present_days": p.present_days,
                          "unpaid_leave_days": p.unpaid_leave_days, "breakdown": p.breakdown,
                          "employee": {"name": e.user.display_name, "employee_no": e.employee_no, "designation": e.designation,

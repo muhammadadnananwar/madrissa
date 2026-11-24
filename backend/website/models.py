@@ -39,6 +39,41 @@ class SiteSettings(TimeStamped):
     min_attendance_percent = models.PositiveIntegerField(default=75)
     working_days = models.JSONField(default=list, blank=True, help_text="Weekday numbers 0=Mon..6=Sun; empty = Mon-Sat")
     notify_guardian_on_absence = models.BooleanField(default=True)
+
+    # --- Uninformed absences (status "Absent"; approved leave, holidays and "Excused" never count) ---------------
+    class PenaltyType(models.TextChoices):
+        PERCENT = "percent", "Percentage of basic salary"
+        FIXED = "fixed", "Fixed amount"
+
+    class PenaltyPer(models.TextChoices):
+        PER_DAY = "per_day", "For each absence above the limit"
+        ONCE = "once", "Once per month when the limit is exceeded"
+
+    class PenaltyScope(models.TextChoices):
+        TEACHING = "teaching", "Teachers only"
+        ALL = "all", "All staff"
+
+    strike_off_enabled = models.BooleanField(
+        "Strike off students automatically", default=True,
+        help_text="Strike off a student's name after consecutive uninformed absences")
+    strike_off_after_days = models.PositiveSmallIntegerField(
+        "Strike off after (consecutive absent days)", default=3,
+        help_text="Consecutive working days marked Absent without leave")
+    staff_penalty_enabled = models.BooleanField(
+        "Fine staff for uninformed absences", default=True,
+        help_text="Deduct a fine from the monthly salary when uninformed absences exceed the limit")
+    staff_absence_limit = models.PositiveSmallIntegerField(
+        "Uninformed absences allowed per month", default=3,
+        help_text="The fine applies to absences above this number in a month")
+    staff_penalty_type = models.CharField(
+        "Fine type", max_length=10, choices=PenaltyType.choices, default=PenaltyType.PERCENT)
+    staff_penalty_value = models.DecimalField(
+        "Fine value", max_digits=10, decimal_places=2, default=2,
+        help_text="Percent of basic salary (e.g. 2 = 2%) or a fixed amount, depending on the fine type")
+    staff_penalty_per = models.CharField(
+        "Fine charged", max_length=10, choices=PenaltyPer.choices, default=PenaltyPer.PER_DAY)
+    staff_penalty_scope = models.CharField(
+        "Fine applies to", max_length=10, choices=PenaltyScope.choices, default=PenaltyScope.TEACHING)
     prayer_city = models.CharField(max_length=60, default="Karachi")
     prayer_country = models.CharField(max_length=60, default="Pakistan")
 

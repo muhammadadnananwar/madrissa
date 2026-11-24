@@ -63,7 +63,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("Demo data already present (use --flush to recreate)."))
             return
         random.seed(7)
-        with transaction.atomic():
+        from attendance.rules import muted
+        # Demo attendance is random: don't let it strike students off or warn staff
+        with transaction.atomic(), muted():
             self.today = timezone.localdate()
             self.reference_data()
             self.site()

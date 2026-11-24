@@ -179,11 +179,14 @@ def working_days(month):
 
 @transaction.atomic
 def generate_payroll(month, deduct_absence=True):
-    """Draft payslips: basic + allowances − deductions − absences/unpaid leave − advance installments."""
+    """Draft payslips: basic + allowances − deductions − absences/unpaid leave − absence fine − advance installments."""
     from attendance.models import StaffAttendance
+    from attendance.rules import absence_penalty
+    from website.models import SiteSettings
     from leaves.models import LeaveRequest
     last = month.replace(day=calendar.monthrange(month.year, month.month)[1])
     wdays = working_days(month)
+    cfg = SiteSettings.get()
     created = updated = skipped = 0
     for emp in Employee.objects.filter(status__in=["active", "on_leave"]).select_related("user"):
         existing = Payslip.objects.filter(employee=emp, month=month).first()
@@ -191,8 +194,9 @@ def generate_payroll(month, deduct_absence=True):
             skipped += 1
             continue
         comps = list(emp.salary_components.filter(is_active=True))
-        allowances = sum((c.amount for c in comps if c.kind == "allowance"), ZERO)
-        deductions = sum((c.amount for c in comps if c.kind == "deduction"), ZERO)
+        allowances = sum((c.value_for(emp.basic_salary) for c in comps if c.kind == "allowance"), ZERO)
+        deductions = sum((c.value_for(emp.basic_salary) for c in comps if c.kind == "deduction"), ZERO)
+        penalty, penalty_info = absence_penalty(emp, month, cfg)
         att = StaffAttendance.objects.filter(employee=emp, date__range=(month, last))
         absent = att.filter(status="absent").count()
         half = att.filter(status="half_day").count()
@@ -217,10 +221,12 @@ def generate_payroll(month, deduct_absence=True):
                 advances[str(a.id)] = str(amt)
                 advance_total += amt
         values = dict(basic=emp.basic_salary, allowances=allowances, deductions=deductions, absence_deduction=absence_ded,
-                      advance_deduction=advance_total, working_days=len(wdays), present_days=present,
+                      advance_deduction=advance_total, penalty_deduction=penalty, working_days=len(wdays), present_days=present,
                       unpaid_leave_days=unpaid,
-                      breakdown={"components": [{"kind": c.kind, "title": c.title, "amount": str(c.amount)} for c in comps],
-                                 "absent_days": absent, "half_days": half, "per_day": str(per_day), "advances": advances})
+                      breakdown={"components": [{"kind": c.kind, "title": c.title, "calculation": c.calculation,
+                                                 "rate": str(c.amount), "amount": str(c.value_for(emp.basic_salary))} for c in comps],
+                                 "absent_days": absent, "half_days": half, "per_day": str(per_day), "advances": advances,
+                                 "absence_fine": {**penalty_info, "amount": str(penalty)}})
         if existing:
             for k, v in values.items():
                 setattr(existing, k, v)

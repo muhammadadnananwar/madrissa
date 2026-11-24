@@ -168,10 +168,22 @@ on the website. Promotions cover year-end promote, detain or graduate, with hist
 - A finance dashboard with charts.
 
 **HR & payroll:**
-- Recurring allowances and deductions, and salary advances (Qarz-e-Hasana) recovered in installments.
-- Monthly payroll that deducts absences and unpaid leave.
+- Recurring allowances and deductions (fixed amount or a percentage of basic salary), and salary advances
+  (Qarz-e-Hasana) recovered in installments.
+- Monthly payroll that deducts absences and unpaid leave, plus the absence fine below.
 - Approve or pay payslips; paying a payslip books it as a salary expense.
-- Printable payslips.
+- Printable payslips showing every allowance, deduction and the absence fine.
+
+**Uninformed absences** (attendance marked *Absent*; approved leave, *Excused* and holidays never count). All limits
+and amounts are edited by admins in **Administration › Institution Settings**:
+- *Students:* after N consecutive working days absent (default 3) the student's status becomes **Struck off**
+  automatically, with the dates recorded; the principal, Nazim, academic coordinator, class teacher, guardian and
+  student are notified. Reinstate with the student's *Change status* action. Can be switched off.
+- *Teachers:* more than N uninformed absences in a month (default 3) adds an **absence fine** to that month's payslip:
+  a percentage of basic salary or a fixed amount, charged for each extra absence or once a month, for teachers only or
+  all staff. The teacher and HR are notified the moment the limit is crossed.
+- The rules run whenever an absence is saved (manual, biometric, live class). Optional nightly re-check:
+  `python manage.py apply_attendance_rules`.
 
 **Library:**
 - A catalogue that supports Arabic titles and e-books.

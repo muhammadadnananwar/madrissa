@@ -22,18 +22,42 @@ function group(title: string, items: HTMLElement[], key: string) {
   return g;
 }
 
+const SIDEBAR_SCROLL = "nav.scrollTop";
+
+/** Keep the sidebar where it was and make sure the current screen's menu item is visible. */
+function revealActive(nav: HTMLElement) {
+  const sidebar = nav.closest<HTMLElement>(".sidebar");
+  // Several links can match by prefix (/attendance and /attendance/biometric): keep only the most specific one.
+  const matches = [...nav.querySelectorAll<HTMLAnchorElement>("a.active")];
+  const best = matches.sort((x, y) => y.getAttribute("href")!.length - x.getAttribute("href")!.length)[0];
+  matches.forEach((m) => m !== best && m.classList.remove("active"));
+  const active = best || null;
+  if (!sidebar) return;
+  active?.closest(".nav-group")?.classList.remove("collapsed"); // expand the group that holds the current page
+  const saved = Number(sessionStorage.getItem(SIDEBAR_SCROLL) || 0);
+  sidebar.scrollTop = saved; // same position as on the previous page (no jump)
+  if (!active) return;
+  const box = sidebar.getBoundingClientRect();
+  const item = active.getBoundingClientRect();
+  if (item.top < box.top + 8 || item.bottom > box.bottom - 8) {
+    sidebar.scrollTop += item.top - box.top - (box.height - item.height) / 2; // centre it
+  }
+}
+
 async function renderNav(user: User) {
   const nav = $("#nav");
+  const sidebar = nav.closest<HTMLElement>(".sidebar");
+  sidebar?.addEventListener("scroll", () => sessionStorage.setItem(SIDEBAR_SCROLL, String(sidebar.scrollTop)), { passive: true });
   const groups = navFor(user.role, !!user.is_superuser);
   clear(nav, groups.map((g) => group(g.group, g.items.map((i) => link(i.href, i.label, i.icon)), g.group)));
+  revealActive(nav); // fixed menu items are known immediately
   try {
     const meta = await get("meta/");
     for (const g of meta.groups) {
       nav.appendChild(group(g.group, g.items.map((i: any) => link(`/m/${i.key}`, i.label, i.icon)), `r.${g.group}`));
     }
-    // expand the group that holds the current page
-    nav.querySelector("a.active")?.closest(".nav-group")?.classList.remove("collapsed");
   } catch { /* offline */ }
+  revealActive(nav); // again once the module screens are in the menu
 }
 
 function renderUser(user: User) {

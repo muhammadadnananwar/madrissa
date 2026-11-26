@@ -602,3 +602,44 @@ class UninformedAbsenceRuleTests(DemoDataTestCase):
         r = self.client_for("admin").get(f"/api/finance/payslips/{slip.id}/print/")
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(Decimal(str(r.json()["penalty_deduction"])), Decimal("500"))
+
+
+class CalendarTests(DemoDataTestCase):
+    URL = "/api/communication/calendar/"
+
+    def test_permissions_and_items_per_role(self):
+        today = timezone.localdate()
+        params = {"start": (today - timedelta(days=40)).isoformat(), "end": (today + timedelta(days=40)).isoformat()}
+        expected = {"admin": (True, True, True), "coordinator": (True, True, False), "media": (True, False, True),
+                    "student1": (False, False, False), "parent1": (False, False, False)}
+        for username, (event, holiday, web) in expected.items():
+            r = self.client_for(username).get(self.URL, params)
+            self.assertEqual(r.status_code, 200, f"{username}: {r.content[:200]}")
+            data = r.json()
+            self.assertEqual(data["can"], {"event": event, "holiday": holiday, "web": web}, username)
+            types = {i["type"] for i in data["items"]}
+            if not web:
+                self.assertNotIn("web", types, username)
+            for i in data["items"]:
+                self.assertIn("id", i)
+
+    def test_bad_dates_are_rejected(self):
+        self.assertEqual(self.client_for("admin").get(self.URL, {"start": "nope"}).status_code, 400)
+
+    def test_create_event_without_slug_and_move_it(self):
+        c = self.client_for("coordinator")
+        body = {"title": "Calendar Test Jalsa", "kind": "jalsa", "start": "2026-12-10T10:00:00Z", "end": "2026-12-10T13:00:00Z", "audience": []}
+        r1 = c.post("/api/events/", body, format="json")
+        r2 = c.post("/api/events/", body, format="json")
+        self.assertEqual(r1.status_code, 201, r1.content)
+        self.assertEqual(r2.status_code, 201, r2.content)
+        self.assertEqual(r1.json()["slug"], "calendar-test-jalsa")
+        self.assertEqual(r2.json()["slug"], "calendar-test-jalsa-2")
+        r = c.patch(f"/api/events/{r1.json()['id']}/", {"start": "2026-12-11T10:00:00Z", "end": "2026-12-11T13:00:00Z"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        items = c.get(self.URL, {"start": "2026-12-01", "end": "2026-12-31"}).json()["items"]
+        self.assertTrue(any(i["type"] == "event" and i["id"] == r1.json()["id"] for i in items))
+
+    def test_student_cannot_create_holiday(self):
+        r = self.client_for("student1").post("/api/holidays/", {"title": "x", "start_date": "2026-12-01", "end_date": "2026-12-01"}, format="json")
+        self.assertIn(r.status_code, (403, 405))

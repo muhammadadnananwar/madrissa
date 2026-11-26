@@ -252,38 +252,65 @@ class FeedView(APIView):
 
 
 class CalendarView(APIView):
-    """Events + holidays + exams + live classes between ?start and ?end."""
+    """Events + holidays + exams + live classes (+ website calendar for web editors) between ?start and ?end.
+
+    Returns {"items": [...], "can": {"event", "holiday", "web"}} so the portal calendar knows what the user may add/edit.
+    """
 
     def get(self, request):
         from academics.models import Holiday
+        from academics.views import HolidayViewSet
+        from cms.models import CalendarItem
+        from cms.views import CalendarItemViewSet
         from exams.models import ExamPaper
         from exams.services import paper_scope
         from liveclasses.models import LiveClass
         from liveclasses.views import live_scope
         today = timezone.localdate()
-        start = datetime.strptime(request.query_params.get("start") or today.replace(day=1).isoformat(), "%Y-%m-%d").date()
-        end = datetime.strptime(request.query_params.get("end") or (start + timedelta(days=42)).isoformat(), "%Y-%m-%d").date()
+        try:
+            start = datetime.strptime(request.query_params.get("start") or today.replace(day=1).isoformat(), "%Y-%m-%d").date()
+            end = datetime.strptime(request.query_params.get("end") or (start + timedelta(days=42)).isoformat(), "%Y-%m-%d").date()
+        except ValueError:
+            raise ValidationError("start and end must be YYYY-MM-DD dates")
         user = request.user
+        can = {"event": EventViewSet.can_write(user), "holiday": HolidayViewSet.can_write(user),
+               "web": CalendarItemViewSet.can_write(user)}
         items = []
+
         events = Event.objects.filter(start__date__lte=end).filter(Q(end__date__gte=start) | Q(end__isnull=True, start__date__gte=start))
-        if not is_admin(user):
+        if not (is_admin(user) or can["event"]):
             events = events.filter(Q(audience=[]) | Q(audience__contains=[user.role]))
         for e in events:
-            items.append({"type": "event", "title": e.title, "start": e.start, "end": e.end, "kind": e.get_kind_display(),
-                          "location": e.location})
+            items.append({"type": "event", "id": e.id, "title": e.title, "start": e.start, "end": e.end, "kind": e.get_kind_display(),
+                          "kind_value": e.kind, "location": e.location, "description": e.description, "audience": e.audience,
+                          "is_public": e.is_public, "editable": can["event"]})
+
         for h in Holiday.objects.filter(start_date__lte=end, end_date__gte=start):
-            items.append({"type": "holiday", "title": h.title, "start": h.start_date, "end": h.end_date, "kind": h.get_kind_display()})
+            items.append({"type": "holiday", "id": h.id, "title": h.title, "start": h.start_date, "end": h.end_date,
+                          "kind": h.get_kind_display(), "kind_value": h.kind, "description": h.description, "editable": can["holiday"]})
+
+        if can["web"]:
+            web = CalendarItem.objects.filter(start_date__lte=end).filter(
+                Q(end_date__gte=start) | Q(end_date__isnull=True, start_date__gte=start))
+            for c in web:
+                items.append({"type": "web", "id": c.id, "title": c.title, "start": c.start_date, "end": c.end_date,
+                              "kind": c.get_category_display(), "kind_value": c.category, "term": c.term,
+                              "description": c.description, "is_published": c.is_published, "editable": True})
+
         papers = ExamPaper.objects.filter(date__range=(start, end)).select_related("subject", "exam", "section")
         if not has_role(user, ACADEMIC + [R.EXAM_CONTROLLER]):
             papers = paper_scope(papers, user)
         for p in papers[:300]:
-            items.append({"type": "exam", "title": f"{p.exam.name}: {p.subject.name}", "start": p.date, "kind": str(p.section)})
+            items.append({"type": "exam", "id": p.id, "title": f"{p.exam.name}: {p.subject.name}", "start": p.date,
+                          "kind": str(p.section), "editable": False})
+
         classes = LiveClass.objects.filter(scheduled_start__date__range=(start, end)).exclude(status="cancelled")
         if not has_role(user, ACADEMIC):
             classes = live_scope(classes, user)
         for lc in classes[:300]:
-            items.append({"type": "live", "title": lc.title, "start": lc.scheduled_start, "id": lc.id})
-        return Response(items)
+            items.append({"type": "live", "id": lc.id, "title": lc.title, "start": lc.scheduled_start,
+                          "end": lc.scheduled_start + timedelta(minutes=lc.duration_minutes or 45), "editable": False})
+        return Response({"items": items, "can": can})
 
 
 class RecipientsView(APIView):

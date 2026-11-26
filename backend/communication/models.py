@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.utils.text import slugify
 
 from academics.models import Section
 from core.models import TimeStamped
@@ -81,7 +82,7 @@ class Event(TimeStamped):
         OTHER = "other", "Other"
 
     title = models.CharField(max_length=200)
-    slug = models.SlugField(max_length=220, unique=True)
+    slug = models.SlugField(max_length=220, unique=True, blank=True, help_text="Leave blank to generate from the title")
     kind = models.CharField(max_length=15, choices=Kind.choices, default=Kind.OTHER)
     description = models.TextField(blank=True)
     start = models.DateTimeField()
@@ -99,6 +100,15 @@ class Event(TimeStamped):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base = slugify(self.title)[:200] or "event"
+            slug, n = base, 2
+            while Event.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug, n = f"{base}-{n}", n + 1
+            self.slug = slug
+        super().save(*args, **kwargs)
 
 
 class Complaint(TimeStamped):
